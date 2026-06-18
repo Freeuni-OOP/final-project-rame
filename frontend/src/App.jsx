@@ -1,35 +1,16 @@
-import { useEffect, useState } from 'react'
-import './App.css'
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import LoginPage from './pages/LoginPage.jsx';
+import Register from './pages/RegisterPage.jsx'; // შემოვიტანოთ ახალი კომპონენტი
 
 function App() {
-    const [message, setMessage] = useState('ველოდები ბექენდს...')
-
-    useEffect(() => {
-        fetch('http://localhost:8080/api/hello')
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('სერვერმა დააბრუნა შეცდომა');
-                }
-                return response.text(); // რადგან ბექენდიდან უბრალო ტექსტი მოდის
-            })
-            .then(data => {
-                setMessage(data); // ვინახავთ მიღებულ ტექსტს
-            })
-            .catch(error => {
-                console.error("შეცდომა კავშირისას:", error);
-                setMessage('ბექენდთან დაკავშირება ვერ მოხერხდა 🛑');
-            });
-    }, [])
-
     return (
-        <div className="App">
-            <h1>სერიალების ტრეკერი</h1>
-            <div className="card">
-                <p>პასუხი ბექენდიდან:</p>
-                <h2>{message}</h2>
-            </div>
-        </div>
-    )
+        <Router>
+            <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<Register />} />
+            </Routes>
+        </Router>
+    );
 }
 
-export default App
+export default App;
