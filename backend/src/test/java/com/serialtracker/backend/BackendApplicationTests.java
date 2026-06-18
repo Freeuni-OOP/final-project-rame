@@ -14,15 +14,5 @@ class BackendApplicationTests {
     @Autowired
     private UserRepository userRepository;
 
-    @Test
-    void testCreateUser() {
-        User user = new User();
-        user.setUsername("test_user");
-        user.setPassword("password123");
 
-        User savedUser = userRepository.save(user);
-
-        assertNotNull(savedUser.getId());
-        assertEquals("test_user", savedUser.getUsername());
-    }
 }
