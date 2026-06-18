@@ -41,5 +41,5 @@ jobs:
       - name: Install dependencies & Run Tests
         run: |
           cd frontend
-          npm install --include=dev #
-          npm run test -- --run
+          npm ci
+          npx vitest run #
