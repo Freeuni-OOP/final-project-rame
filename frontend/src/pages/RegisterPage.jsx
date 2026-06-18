@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import CustomInput from '../components/CustomInput';
+import {isValidEmail} from "../utils/validators.js";
 
 const RegisterPage = () => {
     const [username, setUsername] = useState('');
+    const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [error, setError] = useState('');
@@ -16,13 +18,18 @@ const RegisterPage = () => {
             return;
         }
 
+        if (!isValidEmail(email)) {
+            setError('please enter valid Email!');
+            return;
+        }
+
         try {
             const response = await fetch("https://localhost:8443/api/auth/register", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
                 },
-                body: JSON.stringify({ username, password })
+                body: JSON.stringify({ username, email, password })
             });
 
             if (!response.ok) {
@@ -45,6 +52,7 @@ const RegisterPage = () => {
 
                 <form onSubmit={handleRegister}>
                     <CustomInput type="text" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} required />
+                    <CustomInput type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
                     <CustomInput type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
                     <CustomInput type="password" placeholder="Repeat Password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
 

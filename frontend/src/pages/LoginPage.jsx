@@ -43,7 +43,7 @@ const LoginPage = () => {
                 {error && <p style={{ color: '#ff6b6b', marginBottom: '15px', textAlign: 'center' }}>{error}</p>}
 
                 <form onSubmit={handleLogin}>
-                    <CustomInput type="text" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} required />
+                    <CustomInput type="text"  placeholder="Username or Email" value={username} onChange={(e) => setUsername(e.target.value)} required />
                     <CustomInput type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
 
                     <button type="submit" className="signup-btn">

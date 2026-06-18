@@ -9,7 +9,8 @@ import java.util.Optional;
 public interface UserRepository extends JpaRepository<User, Long> {
     // Spring will automatically: SELECT * FROM users WHERE username = ?
     Optional<User> findByUsername(String username);
-
-    //check if it exists
     boolean existsByUsername(String username);
+    boolean existsByEmail(String email);
+
+    Optional<User> findByUsernameOrEmail(String username, String email);
 }

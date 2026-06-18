@@ -19,27 +19,24 @@ import java.util.Optional;
 public class AuthController {
 
     @Autowired
-    private UserService userService; // შემოგვაქვს სერვისი (ბიზნეს ლოგიკა)
+    private UserService userService;
 
     @Autowired
-    private PasswordEncoder passwordEncoder; // შემოგვაქვს პაროლის შემდარებელი
+    private PasswordEncoder passwordEncoder;
 
     @Autowired
     private JwtUtils jwtUtils;
 
     @PostMapping("/login")
     public ResponseEntity<?> loginUser(@Valid @RequestBody LoginRequest loginRequest) {
+        System.out.println("LOGIN INPUT: " + loginRequest.getUsername());
+        Optional<User> userOptional = userService.getUserByUsernameOrEmail(loginRequest.getUsername());
 
-        Optional<User> userOptional = userService.getUserByUsername(loginRequest.getUsername());
-
-        // 2. თუ იუზერი არსებობს, ვამოწმებთ პაროლს
         if (userOptional.isPresent()) {
             User user = userOptional.get();
 
-            // matches მეთოდი ადარებს მოსულ ღია პაროლს და ბაზიდან წამოღებულ ჰეშს
             if (passwordEncoder.matches(loginRequest.getPassword(), user.getPassword())) {
 
-                // 3. თუ დაემთხვა, ვუგენერირებთ ტოკენს
                 String token = jwtUtils.generateJwtToken(user.getUsername());
                 return ResponseEntity.ok(new LoginResponse(token));
             }
@@ -53,6 +50,7 @@ public class AuthController {
         try {
             User registeredUser = userService.registerUser(
                     registerRequest.getUsername(),
+                    registerRequest.getEmail(),
                     registerRequest.getPassword()
             );
             return ResponseEntity.ok("User registered successfully with ID: " + registeredUser.getId());

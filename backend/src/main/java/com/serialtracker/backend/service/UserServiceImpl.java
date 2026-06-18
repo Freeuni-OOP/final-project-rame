@@ -21,14 +21,29 @@ public class UserServiceImpl implements UserService {
         return userRepository.findByUsername(username);
     }
 
-    public User registerUser(String username, String rawPassword) {
+    @Override
+    public Optional<User> getUserByUsernameOrEmail(String loginInput) {
+        return userRepository.findByUsernameOrEmail(loginInput, loginInput);
+    }
+
+    public UserServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+    }
+
+
+    public User registerUser(String username, String email, String rawPassword) {
         if (userRepository.existsByUsername(username)) {
             throw new RuntimeException("Username is already taken!");
         }
 
+        if (userRepository.existsByEmail(email)) {
+            throw new RuntimeException("Email is already registered!");
+        }
+
         String encodedPassword = passwordEncoder.encode(rawPassword);
 
-        User newUser = new User(username, encodedPassword);
+        User newUser = new User(username, email, encodedPassword);
         return userRepository.save(newUser);
     }
 }
