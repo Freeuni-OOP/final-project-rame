@@ -4,8 +4,6 @@ package com.serialtracker.backend;
 import com.serialtracker.backend.service.TMDBService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.client.MockRestServiceServer;
@@ -16,17 +14,19 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
-//tests for apiconection
-@SpringBootTest
 public class TMDBServiceTest {
 
-    @Autowired
     private TMDBService tmdbService;
-
     private MockRestServiceServer mockServer;
 
     @BeforeEach
     public void setUp() {
+        // ვქმნით სერვისს ხელით და ვუსვამთ საჭირო ველებს @Value-ს ნაცვლად
+        tmdbService = new TMDBService();
+        ReflectionTestUtils.setField(tmdbService, "apiKey", "a1de4b53c576eb9c6c54e242b324e8b1");
+        ReflectionTestUtils.setField(tmdbService, "baseUrl", "https://api.themoviedb.org/3");
+
+        // ვიღებთ შიდა RestTemplate-ს იმიტირებული სერვერისთვის
         RestTemplate restTemplate = (RestTemplate) ReflectionTestUtils.getField(tmdbService, "restTemplate");
         assert restTemplate != null;
         mockServer = MockRestServiceServer.createServer(restTemplate);
