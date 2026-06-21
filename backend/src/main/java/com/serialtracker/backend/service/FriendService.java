@@ -1,6 +1,7 @@
-package com.serialtracker.backend.social;
+package com.serialtracker.backend.service;
 
 import com.serialtracker.backend.entity.User;
+import com.serialtracker.backend.entity.Friendship;
 
 import java.util.List;
 

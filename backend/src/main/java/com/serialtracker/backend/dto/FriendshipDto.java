@@ -1,4 +1,7 @@
-package com.serialtracker.backend.social;
+package com.serialtracker.backend.dto;
+
+import com.serialtracker.backend.entity.Friendship;
+import com.serialtracker.backend.entity.FriendshipStatus;
 
 import java.time.LocalDateTime;
 

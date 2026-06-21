@@ -1,6 +1,5 @@
-package com.serialtracker.backend.social;
+package com.serialtracker.backend.entity;
 
-import com.serialtracker.backend.entity.User;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;

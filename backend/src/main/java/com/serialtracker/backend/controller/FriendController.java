@@ -1,6 +1,9 @@
-package com.serialtracker.backend.social;
+package com.serialtracker.backend.controller;
 
 import com.serialtracker.backend.entity.User;
+import com.serialtracker.backend.service.FriendService;
+import com.serialtracker.backend.entity.Friendship;
+import com.serialtracker.backend.dto.FriendshipDto;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 

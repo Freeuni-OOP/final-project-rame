@@ -1,4 +1,4 @@
-package com.serialtracker.backend.social;
+package com.serialtracker.backend.entity;
 
 /**
  * Represents the state of a friendship/friend-request between two users.

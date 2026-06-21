@@ -1,7 +1,11 @@
-package com.serialtracker.backend.social;
+package com.serialtracker.backend;
 
+import com.serialtracker.backend.entity.Friendship;
+import com.serialtracker.backend.entity.FriendshipStatus;
 import com.serialtracker.backend.entity.User;
+import com.serialtracker.backend.repository.FriendshipRepository;
 import com.serialtracker.backend.repository.UserRepository;
+import com.serialtracker.backend.service.FriendServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
