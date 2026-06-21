@@ -2,6 +2,7 @@ package com.serialtracker.backend.service;
 
 import com.serialtracker.backend.entity.User;
 import com.serialtracker.backend.entity.Friendship;
+import com.serialtracker.backend.dto.FriendSuggestionDto;
 
 import java.util.List;
 
@@ -20,4 +21,6 @@ public interface FriendService {
     List<Friendship> getPendingIncomingRequests(String username);
 
     List<Friendship> getSentRequests(String username);
+
+    List<FriendSuggestionDto> getSuggestedFriends(String username);
 }

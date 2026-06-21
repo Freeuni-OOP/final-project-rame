@@ -23,6 +23,7 @@ class FriendServiceImplTest {
 
     private User alice;
     private User bob;
+    private User carol;
 
     @BeforeEach
     void setUp() {
@@ -34,9 +35,12 @@ class FriendServiceImplTest {
         alice.setId(1L);
         bob = new User("bob", "bob@mail.com", "hashedpass");
         bob.setId(2L);
+        carol = new User("carol", "carol@mail.com", "hashedpass");
+        carol.setId(3L);
 
         when(userRepository.findByUsername("alice")).thenReturn(Optional.of(alice));
         when(userRepository.findByUsername("bob")).thenReturn(Optional.of(bob));
+        when(userRepository.findByUsername("carol")).thenReturn(Optional.of(carol));
     }
 
     @Test
@@ -152,5 +156,45 @@ class FriendServiceImplTest {
 
         assertEquals(1, result.size());
         assertEquals("bob", result.get(0).getRecipient().getUsername());
+    }
+
+    @Test
+    void getSuggestedFriends_suggestsFriendOfFriend_withMutualCount() {
+        // alice <-> bob (accepted), bob <-> carol (accepted).
+        // alice and carol aren't connected at all, so carol should show up
+        // as a suggestion for alice with 1 mutual friend (bob).
+        Friendship aliceBob = new Friendship(alice, bob, FriendshipStatus.ACCEPTED);
+        Friendship bobCarol = new Friendship(bob, carol, FriendshipStatus.ACCEPTED);
+
+        when(friendshipRepository.findAcceptedFriendshipsOf(alice)).thenReturn(List.of(aliceBob));
+        when(friendshipRepository.findAcceptedFriendshipsOf(bob)).thenReturn(List.of(aliceBob, bobCarol));
+        when(friendshipRepository.findByRecipientAndStatus(alice, FriendshipStatus.PENDING)).thenReturn(List.of());
+        when(friendshipRepository.findByRequesterAndStatus(alice, FriendshipStatus.PENDING)).thenReturn(List.of());
+
+        var suggestions = friendService.getSuggestedFriends("alice");
+
+        assertEquals(1, suggestions.size());
+        assertEquals("carol", suggestions.get(0).getUsername());
+        assertEquals(1, suggestions.get(0).getMutualFriendCount());
+    }
+
+    @Test
+    void getSuggestedFriends_excludesUsersWithAnExistingPendingRequest() {
+        // alice <-> bob (accepted), bob <-> carol (accepted), but alice
+        // already sent carol a pending request - so carol should NOT be
+        // suggested again even though she'd otherwise qualify.
+        Friendship aliceBob = new Friendship(alice, bob, FriendshipStatus.ACCEPTED);
+        Friendship bobCarol = new Friendship(bob, carol, FriendshipStatus.ACCEPTED);
+        Friendship aliceCarolPending = new Friendship(alice, carol, FriendshipStatus.PENDING);
+
+        when(friendshipRepository.findAcceptedFriendshipsOf(alice)).thenReturn(List.of(aliceBob));
+        when(friendshipRepository.findAcceptedFriendshipsOf(bob)).thenReturn(List.of(aliceBob, bobCarol));
+        when(friendshipRepository.findByRecipientAndStatus(alice, FriendshipStatus.PENDING)).thenReturn(List.of());
+        when(friendshipRepository.findByRequesterAndStatus(alice, FriendshipStatus.PENDING))
+                .thenReturn(List.of(aliceCarolPending));
+
+        var suggestions = friendService.getSuggestedFriends("alice");
+
+        assertEquals(0, suggestions.size());
     }
 }

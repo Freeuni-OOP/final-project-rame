@@ -4,6 +4,7 @@ import com.serialtracker.backend.entity.User;
 import com.serialtracker.backend.service.FriendService;
 import com.serialtracker.backend.entity.Friendship;
 import com.serialtracker.backend.dto.FriendshipDto;
+import com.serialtracker.backend.dto.FriendSuggestionDto;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -104,6 +105,16 @@ public class FriendController {
                     .map(FriendshipDto::from)
                     .toList();
             return ResponseEntity.ok(sent);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/suggestions")
+    public ResponseEntity<?> getSuggestedFriends(@RequestParam String actingUsername) {
+        try {
+            List<FriendSuggestionDto> suggestions = friendService.getSuggestedFriends(actingUsername);
+            return ResponseEntity.ok(suggestions);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }

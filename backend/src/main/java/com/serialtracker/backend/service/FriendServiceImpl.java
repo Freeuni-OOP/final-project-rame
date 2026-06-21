@@ -5,10 +5,16 @@ import com.serialtracker.backend.repository.UserRepository;
 import com.serialtracker.backend.entity.Friendship;
 import com.serialtracker.backend.repository.FriendshipRepository;
 import com.serialtracker.backend.entity.FriendshipStatus;
+import com.serialtracker.backend.dto.FriendSuggestionDto;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.Comparator;
 
 @Service
 public class FriendServiceImpl implements FriendService {
@@ -103,6 +109,40 @@ public class FriendServiceImpl implements FriendService {
     public List<Friendship> getSentRequests(String username) {
         User user = getUserOrThrow(username);
         return friendshipRepository.findByRequesterAndStatus(user, FriendshipStatus.PENDING);
+    }
+
+    @Override
+    public List<FriendSuggestionDto> getSuggestedFriends(String username) {
+        // "People you may know": anyone who shares at least one friend with
+        // you, but isn't already your friend and has no pending request
+        // with you in either direction. Ranked by how many friends you
+        // have in common with them - more mutual friends, higher up the list.
+
+        List<User> myFriends = getFriends(username);
+
+        // Everyone we should never suggest: ourselves, our existing friends,
+        // and anyone we already have a pending request with (sent or received).
+        Set<String> excluded = new HashSet<>();
+        excluded.add(username);
+        myFriends.forEach(friend -> excluded.add(friend.getUsername()));
+        getPendingIncomingRequests(username).forEach(req -> excluded.add(req.getRequester().getUsername()));
+        getSentRequests(username).forEach(req -> excluded.add(req.getRecipient().getUsername()));
+
+        // Count how many of our friends are also friends with each candidate.
+        Map<String, Integer> mutualCounts = new HashMap<>();
+        for (User friend : myFriends) {
+            for (User friendOfFriend : getFriends(friend.getUsername())) {
+                String candidate = friendOfFriend.getUsername();
+                if (!excluded.contains(candidate)) {
+                    mutualCounts.merge(candidate, 1, Integer::sum);
+                }
+            }
+        }
+
+        return mutualCounts.entrySet().stream()
+                .sorted(Map.Entry.<String, Integer>comparingByValue(Comparator.reverseOrder()))
+                .map(entry -> new FriendSuggestionDto(entry.getKey(), entry.getValue()))
+                .toList();
     }
 
     private User getUserOrThrow(String username) {
