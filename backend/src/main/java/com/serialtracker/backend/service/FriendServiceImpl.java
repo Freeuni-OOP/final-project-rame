@@ -99,6 +99,12 @@ public class FriendServiceImpl implements FriendService {
         return friendshipRepository.findByRecipientAndStatus(user, FriendshipStatus.PENDING);
     }
 
+    @Override
+    public List<Friendship> getSentRequests(String username) {
+        User user = getUserOrThrow(username);
+        return friendshipRepository.findByRequesterAndStatus(user, FriendshipStatus.PENDING);
+    }
+
     private User getUserOrThrow(String username) {
         return userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found: " + username));

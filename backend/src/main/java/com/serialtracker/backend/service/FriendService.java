@@ -18,4 +18,6 @@ public interface FriendService {
     List<User> getFriends(String username);
 
     List<Friendship> getPendingIncomingRequests(String username);
+
+    List<Friendship> getSentRequests(String username);
 }

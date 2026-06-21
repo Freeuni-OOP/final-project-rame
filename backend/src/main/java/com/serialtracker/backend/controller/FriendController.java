@@ -95,4 +95,17 @@ public class FriendController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
+
+    @GetMapping("/sent")
+    public ResponseEntity<?> getSentRequests(@RequestParam String actingUsername) {
+        try {
+            List<FriendshipDto> sent = friendService.getSentRequests(actingUsername)
+                    .stream()
+                    .map(FriendshipDto::from)
+                    .toList();
+            return ResponseEntity.ok(sent);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
 }

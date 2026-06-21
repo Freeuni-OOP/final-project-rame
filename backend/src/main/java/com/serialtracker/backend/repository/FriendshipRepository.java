@@ -28,6 +28,10 @@ public interface FriendshipRepository extends JpaRepository<Friendship, Long> {
     // All requests sent TO "user" that are still waiting for a response.
     List<Friendship> findByRecipientAndStatus(User recipient, FriendshipStatus status);
 
+    // All requests "user" has SENT that are still waiting for a response.
+    // Mirror of findByRecipientAndStatus above, just from the other side.
+    List<Friendship> findByRequesterAndStatus(User requester, FriendshipStatus status);
+
     // All accepted friendships where "user" appears on either side.
     @Query("SELECT f FROM Friendship f WHERE f.status = 'ACCEPTED' " +
             "AND (f.requester = :user OR f.recipient = :user)")

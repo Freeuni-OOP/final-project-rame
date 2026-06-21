@@ -141,4 +141,16 @@ class FriendServiceImplTest {
         assertEquals(1, result.size());
         assertEquals("alice", result.get(0).getRequester().getUsername());
     }
+
+    @Test
+    void getSentRequests_returnsOnlyPendingRequestsThisUserSent() {
+        Friendship pending = new Friendship(alice, bob, FriendshipStatus.PENDING);
+        when(friendshipRepository.findByRequesterAndStatus(alice, FriendshipStatus.PENDING))
+                .thenReturn(List.of(pending));
+
+        List<Friendship> result = friendService.getSentRequests("alice");
+
+        assertEquals(1, result.size());
+        assertEquals("bob", result.get(0).getRecipient().getUsername());
+    }
 }
