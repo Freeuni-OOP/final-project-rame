@@ -1,8 +1,6 @@
 package com.serialtracker.backend.entity;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
 
 import java.time.LocalDateTime;
 
@@ -19,8 +17,6 @@ import java.time.LocalDateTime;
         name = "friendships",
         uniqueConstraints = @UniqueConstraint(columnNames = {"requester_id", "recipient_id"})
 )
-@Getter
-@Setter
 public class Friendship {
 
     @Id
@@ -50,5 +46,47 @@ public class Friendship {
         this.recipient = recipient;
         this.status = status;
         this.createdAt = LocalDateTime.now();
+    }
+
+    // Getters and Setters
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public User getRequester() {
+        return requester;
+    }
+
+    public void setRequester(User requester) {
+        this.requester = requester;
+    }
+
+    public User getRecipient() {
+        return recipient;
+    }
+
+    public void setRecipient(User recipient) {
+        this.recipient = recipient;
+    }
+
+    public FriendshipStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(FriendshipStatus status) {
+        this.status = status;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
     }
 }
