@@ -26,6 +26,7 @@ export default function ShowsPage() {
 
     const navigate = useNavigate();
 
+    // 🚀 დროებითი ვიზუალური სთეითები Letterboxd-ის ეფექტებისთვის
     const [watchedStatus, setWatchedStatus] = useState({}); // 'watched', 'watching', ან null
     const [favorites, setFavorites] = useState({});         // true/false
     const [planToWatch, setPlanToWatch] = useState({});     // true/false

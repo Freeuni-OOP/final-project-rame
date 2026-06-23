@@ -19,7 +19,6 @@ import java.util.List;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    // 🌟 აი ეს ბინი დააკლდა UserServiceImpl-ს!
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
@@ -37,7 +36,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/shows/**").permitAll()
                         .requestMatchers("/api/tracking/**").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .anyRequest().permitAll()
+                        .requestMatchers("/api/friends/**").permitAll()  // TODO(temporary): remove once JWT auth filter exists
+                        .anyRequest().authenticated()
                 );
 
         return http.build();
