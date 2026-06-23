@@ -81,4 +81,37 @@ public class UserTrackingController {
 
         return ResponseEntity.ok(episodeRepository.findByUserIdAndShowId(userId, showId));
     }
+
+    @GetMapping("/get-status")
+    public ResponseEntity<?> getShowStatus(
+            @RequestParam String username,
+            @RequestParam int showId) {
+
+        Long userId = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"))
+                .getId();
+
+        return ResponseEntity.ok(statusRepository.findByUserIdAndShowId(userId, showId).orElse(null));
+    }
+
+    @PostMapping("/toggle-favorite")
+    public ResponseEntity<?> toggleFavorite(
+            @RequestParam String username,
+            @RequestParam int showId) {
+
+        Long userId = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"))
+                .getId();
+
+        UserShowStatus showStatus = statusRepository.findByUserIdAndShowId(userId, showId)
+                .orElse(new UserShowStatus(userId, showId, null));
+
+
+        showStatus.setFavorite(!showStatus.isFavorite());
+        statusRepository.save(showStatus);
+
+        return ResponseEntity.ok(showStatus.isFavorite());
+    }
+
+
 }

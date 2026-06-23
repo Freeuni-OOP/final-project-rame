@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import '../style/ShowsPage.css';
+import { useNavigate } from 'react-router-dom';
 
 const GENRES = [
     { id: 'all', name: 'All Genres' },
@@ -23,7 +24,8 @@ export default function ShowsPage() {
     const [totalPages, setTotalPages] = useState(1);
     const [searchMode, setSearchMode] = useState('trending');
 
-    // 🚀 დროებითი ვიზუალური სთეითები Letterboxd-ის ეფექტებისთვის
+    const navigate = useNavigate();
+
     const [watchedStatus, setWatchedStatus] = useState({}); // 'watched', 'watching', ან null
     const [favorites, setFavorites] = useState({});         // true/false
     const [planToWatch, setPlanToWatch] = useState({});     // true/false
@@ -80,11 +82,10 @@ export default function ShowsPage() {
 
 
     const toggleFavorite = (id) => setFavorites(prev => ({ ...prev, [id]: !prev[id] }));
-    // 🔄 განახლებული ვიზუალური ლოგიკა ურთიერთგამომრიცხაობით
     const toggleWatched = (id) => {
-        // თუ სერიალს ვნიშნავთ როგორც ნანახს/საყურებელს, ის ავტომატურად აღარ არის Dropped
+
         setDropped(prev => ({ ...prev, [id]: false }));
-        setPlanToWatch(prev => ({ ...prev, [id]: false })); // თუ ვუყურებ ან ვნახე, გეგმაში აღარ დევს
+        setPlanToWatch(prev => ({ ...prev, [id]: false }));
 
         setWatchedStatus(prev => {
             const current = prev[id];
@@ -149,7 +150,12 @@ export default function ShowsPage() {
         if (watchMode === 'watching') eyeClass += " active-half";
 
         return (
-            <div key={show.id} className="show-card">
+            <div
+                key={show.id}
+                className="show-card"
+                onClick={() => navigate(`/shows/${id}`)}
+                style={{ cursor: 'pointer' }}
+            >
                 <div className="card-image-wrapper">
                     {show.poster_path ? (
                         <img src={`https://image.tmdb.org/t/p/w500${show.poster_path}`} alt={show.name} className="show-poster" />
@@ -159,46 +165,47 @@ export default function ShowsPage() {
                     <div className="rating-badge">★ {show.vote_average ? show.vote_average.toFixed(1) : 'N/A'}</div>
                 </div>
 
-                {/* 🪐 ახალი მინიმალისტური Letterboxd ოვერლეი */}
                 <div className="show-details-overlay">
                     <div className="text-meta">
                         <h3 className="overlay-show-title">{show.name}</h3>
                         <p className="show-date">{show.first_air_date ? show.first_air_date.split('-')[0] : 'N/A'}</p>
                     </div>
 
-                    {/* 🛠️ QUICK ADD PANEL */}
-                    <div className="letterboxd-actions">
-                        {/* თვალი (Watched / Watching) */}
+
+                    {/* დავამატეთ onClick={() => e.stopPropagation()} თითოეულ ღილაკზე,
+                       რომ ღილაკზე კლიკმა არ გადაგვიყვანოს დეტალების გვერდზე */}
+                    <div className="letterboxd-actions" onClick={(e) => e.stopPropagation()}>
+                        {/* eye */}
                         <button
                             className={eyeClass}
-                            onClick={() => toggleWatched(id)}
+                            onClick={(e) => { e.stopPropagation(); toggleWatched(id); }}
                             title={watchMode === 'watched' ? 'Watched' : watchMode === 'watching' ? 'Watching' : 'Mark as Watched/Watching'}
                         >
                             👁
                         </button>
 
-                        {/* გული (Favourite) */}
+                        {/* heart */}
                         <button
                             className={`action-icon heart-icon ${isFav ? 'active' : ''}`}
-                            onClick={() => toggleFavorite(id)}
+                            onClick={(e) => { e.stopPropagation(); toggleFavorite(id); }}
                             title="Favorite"
                         >
                             {isFav ? '❤️' : '♡'}
                         </button>
 
-                        {/* ვარსკვლავი (Plan to watch) */}
+                        {/* star */}
                         <button
                             className={`action-icon star-icon ${isPlan ? 'active' : ''}`}
-                            onClick={() => togglePlan(id)}
+                            onClick={(e) => { e.stopPropagation(); togglePlan(id); }}
                             title="Plan to Watch"
                         >
                             ★
                         </button>
 
-                        {/* X (Dropped) */}
+                        {/* X */}
                         <button
                             className={`action-icon drop-icon ${isDrop ? 'active' : ''}`}
-                            onClick={() => toggleDropped(id)}
+                            onClick={(e) => { e.stopPropagation(); toggleDropped(id); }}
                             title="Dropped"
                         >
                             ✕
