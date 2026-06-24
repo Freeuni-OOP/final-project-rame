@@ -13,7 +13,7 @@ const GENRES = [
 ];
 
 export default function ShowsPage() {
-    const [trendingShows, setTrendingShows] = useState([]);
+    const [trendingShowsList, setTrendingShowsList] = useState([]);
     const [allShows, setAllShows] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedGenre, setSelectedGenre] = useState('all');
@@ -26,29 +26,71 @@ export default function ShowsPage() {
 
     const navigate = useNavigate();
 
-    // 🚀 დროებითი ვიზუალური სთეითები Letterboxd-ის ეფექტებისთვის
-    const [watchedStatus, setWatchedStatus] = useState({}); // 'watched', 'watching', ან null
-    const [favorites, setFavorites] = useState({});         // true/false
-    const [planToWatch, setPlanToWatch] = useState({});     // true/false
-    const [dropped, setDropped] = useState({});             // true/false
+    // ბაზიდან წამოღებული რეალური სტატუსების სთეითები
+    const [activeStatus, setActiveStatus] = useState({}); // ინახავს სტატუსს თითოეული შოუს ID-ისთვის
+    const [favorites, setFavorites] = useState({});       // ინახავს true/false თითოეული შოუს ID-ისთვის
 
     const BASE_URL = 'https://localhost:8443/api/shows';
+    const TRACKING_URL = 'https://localhost:8443/api/tracking';
     const ribbonRef = useRef(null);
+
+    // 🔐 ტოკენის ამოღება და პარსინგი (ზუსტად როგორც Details გვერდზე)
+    const tokenObj = localStorage.getItem('token');
+    const token = tokenObj ? JSON.parse(tokenObj).token : null;
+
+    const parseJwt = (token) => {
+        if (!token) return null;
+        try {
+            return JSON.parse(atob(token.split('.')[1]));
+        } catch (e) {
+            return null;
+        }
+    };
+
+    const decodedToken = parseJwt(token);
+    const username = decodedToken?.sub;
 
     useEffect(() => {
         fetchRibbonTrending();
         fetchGridShows(1, 'trending', '', 'all');
     }, []);
 
+    // ყოველ ჯერზე, როცა სერიალების სია განახლდება, სათითაოდ მოგვაქვს მათი სტატუსები ბაზიდან
+    useEffect(() => {
+        if (!username) return;
+        const uniqueShowIds = [...new Set([...allShows, ...trendingShowsList].map(s => s.id))];
+        uniqueShowIds.forEach(id => {
+            fetchShowStatusFromBackend(id);
+        });
+    }, [allShows, trendingShowsList, token, username]);
+
+    // ბაზიდან კონკრეტული სერიალის სტატუსის და ფავორიტის წამოღება
+    const fetchShowStatusFromBackend = (showId) => {
+        fetch(`${TRACKING_URL}/get-status?username=${username}&showId=${showId}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        })
+            .then(res => {
+                if (res.ok) return res.json();
+                return null;
+            })
+            .then(data => {
+                if (data) {
+                    setActiveStatus(prev => ({ ...prev, [showId]: data.status }));
+                    setFavorites(prev => ({ ...prev, [showId]: data.favorite }));
+                }
+            })
+            .catch(err => console.error(`Error fetching status for show ${showId}:`, err));
+    };
+
     const fetchRibbonTrending = async () => {
         try {
             const response = await fetch(`${BASE_URL}/trending?page=1`);
             if (response.ok) {
                 const data = await response.json();
-                setTrendingShows(data.results || []);
+                setTrendingShowsList(data.results || []);
             }
         } catch (error) {
-            System.out.println("Error loading ribbon: " + error);
+            console.error("Error loading ribbon: ", error);
         }
     };
 
@@ -81,38 +123,32 @@ export default function ShowsPage() {
         }
     };
 
+    // სტატუსის განახლების ლოგიკა (POST მოთხოვნა ტოკენით)
+    const handleStatusUpdate = (showId, statusName) => {
+        const currentStatus = activeStatus[showId];
+        const newStatus = currentStatus === statusName ? null : statusName;
 
-    const toggleFavorite = (id) => setFavorites(prev => ({ ...prev, [id]: !prev[id] }));
-    const toggleWatched = (id) => {
+        setActiveStatus(prev => ({ ...prev, [showId]: newStatus }));
 
-        setDropped(prev => ({ ...prev, [id]: false }));
-        setPlanToWatch(prev => ({ ...prev, [id]: false }));
-
-        setWatchedStatus(prev => {
-            const current = prev[id];
-            if (!current) return { ...prev, [id]: 'watched' };   // 1 კლიკი: Watched
-            if (current === 'watched') return { ...prev, [id]: 'watching' }; // 2 კლიკი: Watching
-            return { ...prev, [id]: null };                       // 3 კლიკი: Off
-        });
+        fetch(`${TRACKING_URL}/show-status?username=${username}&showId=${showId}&status=${statusName}`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        })
+            .catch(err => console.error("Request failed:", err));
     };
 
-    const togglePlan = (id) => {
-        // თუ გეგმაში ვამატებთ, ავტომატურად იშლება Dropped და ნანახის სტატუსები
-        setDropped(prev => ({ ...prev, [id]: false }));
-        setWatchedStatus(prev => ({ ...prev, [id]: null }));
+    // ფავორიტის გადართვის ლოგიკა (POST მოთხოვნა ტოკენით)
+    const handleFavoriteToggle = (showId) => {
+        const currentFav = !!favorites[showId];
+        setFavorites(prev => ({ ...prev, [showId]: !currentFav }));
 
-        setPlanToWatch(prev => ({ ...prev, [id]: !prev[id] }));
+        fetch(`${TRACKING_URL}/toggle-favorite?username=${username}&showId=${showId}`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        })
+            .catch(err => console.error("Favorite toggle failed:", err));
     };
 
-    const toggleDropped = (id) => {
-        // თუ სერიალს ვაგდებთ (Dropped), ავტომატურად უქმდება ნანახი/საყურებელი და გეგმები
-        if (!dropped[id]) {
-            setWatchedStatus(prev => ({ ...prev, [id]: null }));
-            setPlanToWatch(prev => ({ ...prev, [id]: false }));
-        }
-
-        setDropped(prev => ({ ...prev, [id]: !prev[id] }));
-    };
     const handleSearch = (e) => {
         e.preventDefault();
         setSelectedGenre('all');
@@ -140,15 +176,13 @@ export default function ShowsPage() {
 
     const renderShowCard = (show) => {
         const id = show.id;
-        const isFav = favorites[id];
-        const isPlan = planToWatch[id];
-        const isDrop = dropped[id];
-        const watchMode = watchedStatus[id]; // 'watched', 'watching', ან undefined
+        const isFavoriteShow = !!favorites[id];
+        const currentShowStatus = activeStatus[id];
 
-        // თვალის აიქონის დინამიკური კლასი
+        // თვალის აიქონის კლასების განსაზღვრა (Details გვერდის ანალოგიურად)
         let eyeClass = "action-icon eye-icon";
-        if (watchMode === 'watched') eyeClass += " active-full";
-        if (watchMode === 'watching') eyeClass += " active-half";
+        if (currentShowStatus === 'WATCHING') eyeClass += " active-half";
+        if (currentShowStatus === 'COMPLETED') eyeClass += " active-full";
 
         return (
             <div
@@ -172,46 +206,50 @@ export default function ShowsPage() {
                         <p className="show-date">{show.first_air_date ? show.first_air_date.split('-')[0] : 'N/A'}</p>
                     </div>
 
+                    {username && (
+                        <div className="letterboxd-actions" onClick={(e) => e.stopPropagation()}>
+                            {/* WATCHING / COMPLETED (თვალი) */}
+                            <button
+                                className={eyeClass}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (!currentShowStatus) handleStatusUpdate(id, 'WATCHING');
+                                    else if (currentShowStatus === 'WATCHING') handleStatusUpdate(id, 'COMPLETED');
+                                    else handleStatusUpdate(id, null);
+                                }}
+                                title="Mark as Watched / Watching"
+                            >
+                                👁
+                            </button>
 
-                    {/* დავამატეთ onClick={() => e.stopPropagation()} თითოეულ ღილაკზე,
-                       რომ ღილაკზე კლიკმა არ გადაგვიყვანოს დეტალების გვერდზე */}
-                    <div className="letterboxd-actions" onClick={(e) => e.stopPropagation()}>
-                        {/* eye */}
-                        <button
-                            className={eyeClass}
-                            onClick={(e) => { e.stopPropagation(); toggleWatched(id); }}
-                            title={watchMode === 'watched' ? 'Watched' : watchMode === 'watching' ? 'Watching' : 'Mark as Watched/Watching'}
-                        >
-                            👁
-                        </button>
+                            {/* FAVORITE (გული) */}
+                            <button
+                                className={`action-icon heart-icon ${isFavoriteShow ? 'active' : ''}`}
+                                onClick={(e) => { e.stopPropagation(); handleFavoriteToggle(id); }}
+                                title="Favorite"
+                            >
+                                {isFavoriteShow ? '❤️' : '♡'}
+                            </button>
 
-                        {/* heart */}
-                        <button
-                            className={`action-icon heart-icon ${isFav ? 'active' : ''}`}
-                            onClick={(e) => { e.stopPropagation(); toggleFavorite(id); }}
-                            title="Favorite"
-                        >
-                            {isFav ? '❤️' : '♡'}
-                        </button>
+                            {/* PLAN TO WATCH (ვარსკვლავი) */}
+                            <button
+                                className={`action-icon star-icon ${currentShowStatus === 'PLAN_TO_WATCH' ? 'active' : ''}`}
+                                onClick={(e) => { e.stopPropagation(); handleStatusUpdate(id, 'PLAN_TO_WATCH'); }}
+                                title="Plan to Watch"
+                            >
+                                ★
+                            </button>
 
-                        {/* star */}
-                        <button
-                            className={`action-icon star-icon ${isPlan ? 'active' : ''}`}
-                            onClick={(e) => { e.stopPropagation(); togglePlan(id); }}
-                            title="Plan to Watch"
-                        >
-                            ★
-                        </button>
-
-                        {/* X */}
-                        <button
-                            className={`action-icon drop-icon ${isDrop ? 'active' : ''}`}
-                            onClick={(e) => { e.stopPropagation(); toggleDropped(id); }}
-                            title="Dropped"
-                        >
-                            ✕
-                        </button>
-                    </div>
+                            {/* DROPPED (X აიქონი) */}
+                            <button
+                                className={`action-icon drop-icon ${currentShowStatus === 'DROPPED' ? 'active' : ''}`}
+                                onClick={(e) => { e.stopPropagation(); handleStatusUpdate(id, 'DROPPED'); }}
+                                title="Dropped"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
         );
@@ -239,7 +277,7 @@ export default function ShowsPage() {
                 </form>
             </header>
 
-            {searchMode === 'trending' && trendingShows.length > 0 && (
+            {searchMode === 'trending' && trendingShowsList.length > 0 && (
                 <div className="ribbon-section">
                     <div className="ribbon-header">
                         <h2 className="section-title">Trending This Week</h2>
@@ -249,7 +287,7 @@ export default function ShowsPage() {
                         </div>
                     </div>
                     <div className="ribbon-track" ref={ribbonRef}>
-                        {trendingShows.map(show => renderShowCard(show))}
+                        {trendingShowsList.map(show => renderShowCard(show))}
                     </div>
                 </div>
             )}
