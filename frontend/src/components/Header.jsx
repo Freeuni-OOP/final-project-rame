@@ -1,19 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { PlusCircle } from 'lucide-react';
+import LogModal from './LogModal';
 import '../style/Header.css';
 
 export default function Header() {
     const navigate = useNavigate();
     const location = useLocation();
     const [searchQuery, setSearchQuery] = useState('');
-
+    const [showLog, setShowLog] = useState(false);
 
     useEffect(() => {
         const params = new URLSearchParams(location.search);
         setSearchQuery(params.get('query') || '');
     }, [location.search]);
-
 
     const tokenObj = localStorage.getItem('token');
     const token = tokenObj ? JSON.parse(tokenObj).token : null;
@@ -51,7 +51,6 @@ export default function Header() {
                     </nav>
                 </div>
 
-
                 <div className="header-middle">
                     <form onSubmit={handleSearchSubmit} className="header-search-form">
                         <input
@@ -69,7 +68,7 @@ export default function Header() {
                     {username ? (
                         <>
                             {/* ავტორიზებული იუზერი */}
-                            <button className="header-log-btn" onClick={() => navigate('/log')}>
+                            <button className="header-log-btn" onClick={() => setShowLog(true)}>
                                 <PlusCircle size={16} />
                                 <span>LOG</span>
                             </button>
@@ -95,6 +94,8 @@ export default function Header() {
                 </div>
 
             </div>
+
+            {showLog && <LogModal onClose={() => setShowLog(false)} />}
         </header>
     );
 }

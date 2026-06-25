@@ -35,6 +35,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/shows/**").permitAll()
                         .requestMatchers("/api/tracking/**").permitAll()
+                        .requestMatchers("/api/log/**").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/friends/**").permitAll()  // TODO(temporary): remove once JWT auth filter exists
                         .anyRequest().authenticated()
