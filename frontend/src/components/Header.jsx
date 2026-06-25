@@ -48,6 +48,7 @@ export default function Header() {
                     <nav className="header-nav">
                         <Link to="/shows" className="nav-item">TV Series</Link>
                         <Link to="/lists" className="nav-item">Lists</Link>
+                        <Link to="/friends" className="nav-item">Members</Link>
                     </nav>
                 </div>
 
