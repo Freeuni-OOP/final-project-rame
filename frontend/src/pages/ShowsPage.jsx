@@ -26,15 +26,13 @@ export default function ShowsPage() {
 
     const navigate = useNavigate();
 
-    // ბაზიდან წამოღებული რეალური სტატუსების სთეითები
-    const [activeStatus, setActiveStatus] = useState({}); // ინახავს სტატუსს თითოეული შოუს ID-ისთვის
-    const [favorites, setFavorites] = useState({});       // ინახავს true/false თითოეული შოუს ID-ისთვის
+    const [activeStatus, setActiveStatus] = useState({});
+    const [favorites, setFavorites] = useState({});
 
     const BASE_URL = 'https://localhost:8443/api/shows';
     const TRACKING_URL = 'https://localhost:8443/api/tracking';
     const ribbonRef = useRef(null);
 
-    // 🔐 ტოკენის ამოღება და პარსინგი (ზუსტად როგორც Details გვერდზე)
     const tokenObj = localStorage.getItem('token');
     const token = tokenObj ? JSON.parse(tokenObj).token : null;
 
@@ -55,7 +53,6 @@ export default function ShowsPage() {
         fetchGridShows(1, 'trending', '', 'all');
     }, []);
 
-    // ყოველ ჯერზე, როცა სერიალების სია განახლდება, სათითაოდ მოგვაქვს მათი სტატუსები ბაზიდან
     useEffect(() => {
         if (!username) return;
         const uniqueShowIds = [...new Set([...allShows, ...trendingShowsList].map(s => s.id))];
@@ -64,7 +61,6 @@ export default function ShowsPage() {
         });
     }, [allShows, trendingShowsList, token, username]);
 
-    // ბაზიდან კონკრეტული სერიალის სტატუსის და ფავორიტის წამოღება
     const fetchShowStatusFromBackend = (showId) => {
         fetch(`${TRACKING_URL}/get-status?username=${username}&showId=${showId}`, {
             headers: { 'Authorization': `Bearer ${token}` }
@@ -123,21 +119,51 @@ export default function ShowsPage() {
         }
     };
 
-    // სტატუსის განახლების ლოგიკა (POST მოთხოვნა ტოკენით)
+    // განახლებული სტატუსის მართვა მთავარ გვერდზეც
     const handleStatusUpdate = (showId, statusName) => {
         const currentStatus = activeStatus[showId];
         const newStatus = currentStatus === statusName ? null : statusName;
 
         setActiveStatus(prev => ({ ...prev, [showId]: newStatus }));
 
-        fetch(`${TRACKING_URL}/show-status?username=${username}&showId=${showId}&status=${statusName}`, {
+        // ⚡ ვაწვდით ახალ სტატუსს (newStatus-ს) ბექენდს
+        fetch(`${TRACKING_URL}/show-status?username=${username}&showId=${showId}&status=${newStatus !== null ? newStatus : ''}`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` }
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
         })
-            .catch(err => console.error("Request failed:", err));
+            .then((res) => {
+                if (!res.ok) throw new Error("Failed to update status");
+
+                // თუ მონიშნა COMPLETED
+                if (newStatus === 'COMPLETED') {
+                    fetch(`${TRACKING_URL}/watch-all-episodes?username=${username}&showId=${showId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    }).catch(err => console.error(err));
+                }
+                // თუ სრულად გააუქმა სტატუსი (მოხსნა თვალი ან ვარსკვლავი)
+                else if (newStatus === null) {
+                    fetch(`${TRACKING_URL}/unwatch-all-episodes?username=${username}&showId=${showId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    }).catch(err => console.error(err));
+                }
+            })
+            .catch(err => {
+                console.error("Request failed:", err);
+                setActiveStatus(prev => ({ ...prev, [showId]: currentStatus }));
+            });
     };
 
-    // ფავორიტის გადართვის ლოგიკა (POST მოთხოვნა ტოკენით)
     const handleFavoriteToggle = (showId) => {
         const currentFav = !!favorites[showId];
         setFavorites(prev => ({ ...prev, [showId]: !currentFav }));
@@ -179,7 +205,6 @@ export default function ShowsPage() {
         const isFavoriteShow = !!favorites[id];
         const currentShowStatus = activeStatus[id];
 
-        // თვალის აიქონის კლასების განსაზღვრა (Details გვერდის ანალოგიურად)
         let eyeClass = "action-icon eye-icon";
         if (currentShowStatus === 'WATCHING') eyeClass += " active-half";
         if (currentShowStatus === 'COMPLETED') eyeClass += " active-full";
@@ -208,7 +233,6 @@ export default function ShowsPage() {
 
                     {username && (
                         <div className="letterboxd-actions" onClick={(e) => e.stopPropagation()}>
-                            {/* WATCHING / COMPLETED (თვალი) */}
                             <button
                                 className={eyeClass}
                                 onClick={(e) => {
@@ -222,7 +246,6 @@ export default function ShowsPage() {
                                 👁
                             </button>
 
-                            {/* FAVORITE (გული) */}
                             <button
                                 className={`action-icon heart-icon ${isFavoriteShow ? 'active' : ''}`}
                                 onClick={(e) => { e.stopPropagation(); handleFavoriteToggle(id); }}
@@ -231,7 +254,6 @@ export default function ShowsPage() {
                                 {isFavoriteShow ? '❤️' : '♡'}
                             </button>
 
-                            {/* PLAN TO WATCH (ვარსკვლავი) */}
                             <button
                                 className={`action-icon star-icon ${currentShowStatus === 'PLAN_TO_WATCH' ? 'active' : ''}`}
                                 onClick={(e) => { e.stopPropagation(); handleStatusUpdate(id, 'PLAN_TO_WATCH'); }}
@@ -240,7 +262,6 @@ export default function ShowsPage() {
                                 ★
                             </button>
 
-                            {/* DROPPED (X აიქონი) */}
                             <button
                                 className={`action-icon drop-icon ${currentShowStatus === 'DROPPED' ? 'active' : ''}`}
                                 onClick={(e) => { e.stopPropagation(); handleStatusUpdate(id, 'DROPPED'); }}

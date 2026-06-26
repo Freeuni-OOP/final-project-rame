@@ -48,7 +48,7 @@ function ShowsDetailsPage() {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
                 .then(res => res.json())
-                .then(data => setWatchedEpisodes(data))
+                .then(data => setWatchedEpisodes(data || []))
                 .catch(err => console.error("Error fetching watched episodes:", err));
 
             fetch(`https://localhost:8443/api/tracking/get-status?username=${decodedToken.sub}&showId=${id}`, {
@@ -66,14 +66,61 @@ function ShowsDetailsPage() {
     }, [id, selectedSeason, token, decodedToken?.sub]);
 
     const handleStatusUpdate = (statusName) => {
+        // თუ მიმდინარე სტატუსი ემთხვევა დაჭერილს, ახალი სტატუსი ხდება null (უქმდება)
         const newStatus = activeStatus === statusName ? null : statusName;
         setActiveStatus(newStatus);
 
-        fetch(`https://localhost:8443/api/tracking/show-status?username=${decodedToken?.sub}&showId=${id}&status=${statusName}`, {
+        // ⚡ ყურადღება: ბექენდს ვუგზავნით newStatus-ს! თუ null-ია, ვუგზავნით ცარიელ სტრინგს
+        fetch(`https://localhost:8443/api/tracking/show-status?username=${decodedToken?.sub}&showId=${id}&status=${newStatus !== null ? newStatus : ''}`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` }
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
         })
-            .catch(err => console.error("Request failed:", err));
+            .then((res) => {
+                if (!res.ok) throw new Error("Failed to update status");
+
+                // 🟢 თუ ახალი სტატუსი გახდა COMPLETED -> მონიშნე ყველა ეპიზოდი
+                if (newStatus === 'COMPLETED') {
+                    fetch(`https://localhost:8443/api/tracking/watch-all-episodes?username=${decodedToken?.sub}&showId=${id}`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    })
+                        .then(episodeRes => {
+                            if (!episodeRes.ok) throw new Error("Backend failed to sync episodes");
+                            return fetch(`https://localhost:8443/api/tracking/watched-episodes?username=${decodedToken.sub}&showId=${id}`, {
+                                headers: { 'Authorization': `Bearer ${token}` }
+                            });
+                        })
+                        .then(res => res && res.json())
+                        .then(data => { if (data) setWatchedEpisodes(data); })
+                        .catch(err => console.error("Error setting all watched:", err));
+                }
+
+                // 🔴 თუ ახალი სტატუსი გახდა null (ანუ მომხმარებელმა გააუქმა თვალი, ვარსკვლავი ან სხვა რამ)
+                else if (newStatus === null) {
+                    fetch(`https://localhost:8443/api/tracking/unwatch-all-episodes?username=${decodedToken?.sub}&showId=${id}`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    })
+                        .then(episodeRes => {
+                            if (!episodeRes.ok) throw new Error("Backend failed to clear episodes");
+                            setWatchedEpisodes([]); // ეპიზოდებს ვუშლით ნანახის ვიზუალს მომენტალურად
+                        })
+                        .catch(err => console.error("Error clearing watched episodes:", err));
+                }
+            })
+            .catch(err => {
+                console.error("Request failed:", err);
+                setActiveStatus(activeStatus); // ჩავარდნის შემთხვევაში ვაბრუნებთ ძველ სტატუსს
+            });
     };
 
     const handleFavoriteToggle = () => {
@@ -87,6 +134,15 @@ function ShowsDetailsPage() {
     };
 
     const handleEpisodeToggle = (seasonNum, episodeNum) => {
+        // ⚡ თუ სერიალი იყო COMPLETED და ეპიზოდს მოვუხსენით ნიშნული, სტატუსი ხდება WATCHING
+        if (activeStatus === 'COMPLETED') {
+            setActiveStatus('WATCHING');
+            fetch(`https://localhost:8443/api/tracking/show-status?username=${decodedToken?.sub}&showId=${id}&status=WATCHING`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+            }).catch(err => console.error(err));
+        }
+
         fetch(`https://localhost:8443/api/tracking/toggle-episode?username=${decodedToken?.sub}&showId=${id}&seasonNumber=${seasonNum}&episodeNumber=${episodeNum}`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` }
@@ -103,6 +159,11 @@ function ShowsDetailsPage() {
     };
 
     const isEpisodeWatched = (seasonNum, episodeNum) => {
+        // თუ სერიალის სტატუსი არის COMPLETED, ყველა ეპიზოდი ავტომატურად ნანახია!
+        if (activeStatus === 'COMPLETED') {
+            return true;
+        }
+        // სხვა შემთხვევაში ვამოწმებთ სათითაოდ მონიშნულების მასივს
         return watchedEpisodes.some(ep => ep.seasonNumber === seasonNum && ep.episodeNumber === episodeNum);
     };
 
@@ -126,8 +187,6 @@ function ShowsDetailsPage() {
 
     return (
         <div className="details-page-wrapper">
-
-            {/* უკანა ფონი */}
             {backdropUrl && (
                 <div
                     className="backdrop-bg-layer"
@@ -136,8 +195,6 @@ function ShowsDetailsPage() {
             )}
 
             <div className="details-container">
-
-                {/*  მარცხენა პანელი */}
                 <aside className="left-panel">
                     <div className="poster-wrapper">
                         {showData.poster_path ? (
@@ -199,21 +256,15 @@ function ShowsDetailsPage() {
                     )}
                 </aside>
 
-                {/*  მარჯვენა პანელი */}
                 <main className="right-panel">
                     <h1 className="show-title-main">{showData.name}</h1>
                     <div className="show-rating-main">⭐ {showData.vote_average?.toFixed(1)} / 10</div>
                     <p className="show-overview-main">{showData.overview}</p>
 
-                    <div className="placeholder-tabs">
-                        {/* მომავალი ქასთის ტაბები */}
-                    </div>
-
+                    <div className="placeholder-tabs"></div>
                     <hr className="panel-divider" />
 
-                    {/*  ეპიზოდების სექციის დასაწყისი */}
                     <div className="episodes-section-container">
-
                         <div className="season-selector-container">
                             <select
                                 value={selectedSeason}
@@ -229,10 +280,7 @@ function ShowsDetailsPage() {
                         </div>
 
                         <div className="carousel-wrapper-relative">
-
-                            <button className="carousel-arrow-btn left-arrow" onClick={() => scrollCarousel('left')}>
-                                ⟨
-                            </button>
+                            <button className="carousel-arrow-btn left-arrow" onClick={() => scrollCarousel('left')}>⟨</button>
 
                             <div className="episodes-carousel-track" ref={carouselRef}>
                                 {seasonEpisodes?.map((episode) => {
@@ -255,9 +303,7 @@ function ShowsDetailsPage() {
                                                 </div>
 
                                                 {episode.vote_average > 0 && (
-                                                    <div className="ep-card-rating">
-                                                        ⭐ {episode.vote_average.toFixed(1)}
-                                                    </div>
+                                                    <div className="ep-card-rating">⭐ {episode.vote_average.toFixed(1)}</div>
                                                 )}
                                             </div>
 
@@ -270,18 +316,12 @@ function ShowsDetailsPage() {
                                 })}
                             </div>
 
-                            <button className="carousel-arrow-btn right-arrow" onClick={() => scrollCarousel('right')}>
-                                ⟩
-                            </button>
-
+                            <button className="carousel-arrow-btn right-arrow" onClick={() => scrollCarousel('right')}>⟩</button>
                         </div>
                     </div>
 
-                    <div className="reviews-section-future" style={{ marginTop: '50px', paddingBottom: '100px' }}>
-                        {/* მომავალი რივიუები */}
-                    </div>
+                    <div className="reviews-section-future" style={{ marginTop: '50px', paddingBottom: '100px' }}></div>
                 </main>
-
             </div>
         </div>
     );
