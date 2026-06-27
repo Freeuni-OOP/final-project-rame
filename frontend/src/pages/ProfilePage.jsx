@@ -1,0 +1,601 @@
+import React, { useEffect, useState } from 'react';
+import '../style/ProfilePage.css';
+
+const FRIENDS_BASE_URL = 'https://localhost:8443/api/friends';
+
+// The backend has no "films watched" / "favorite films" / activity-log
+// feature yet, so these are deliberately fixed placeholders until that
+// exists. Friends count below is real (pulled from the Friends endpoint).
+const PLACEHOLDER_FILMS_COUNT = 0;
+
+const RECENT_ACTIVITY_GRID = [
+    { type: 'like' },
+    { type: 'like' },
+    { type: 'rating', stars: 3 },
+    { type: 'none' },
+];
+
+const ACTIVITY_FEED_PLACEHOLDER = [
+    { text: 'You sent a friend request to nika99', time: '2h' },
+    { text: 'You rated Wuthering Heights ★★★', time: '1d' },
+    { text: 'You liked Normal People', time: '2d' },
+    { text: 'You added Notting Hill to your watchlist', time: '4d' },
+    { text: 'mariami accepted your friend request', time: '6d' },
+];
+
+// No "favorite movies/actors" feature exists on the backend yet, so this
+// tab is entirely fixed placeholder shapes/counts until that data exists.
+const FAVORITE_MOVIES_COUNT = 6;
+const FAVORITE_ACTORS_COUNT = 6;
+
+// No watch-log/diary feature exists on the backend yet, so these rows are
+// entirely fixed placeholder data until that exists.
+const DIARY_FILTERS = ['Rating', 'Diary Year', 'Decade', 'Genre', 'Service', 'Sort by Watched Date'];
+
+const DIARY_PLACEHOLDER = [
+    { monthBadge: { month: 'MAY', year: 2026 }, day: 16, title: 'The Amazing Spider-Man 2', released: 2014, rating: 0, liked: true },
+    { monthBadge: null, day: 15, title: 'Normal People', released: 2020, rating: 0, liked: true },
+    { monthBadge: { month: 'FEB', year: 2026 }, day: 16, title: 'Wuthering Heights', released: 2026, rating: 3, liked: false },
+    { monthBadge: { month: 'SEP', year: 2025 }, day: 20, title: 'Notting Hill', released: 1999, rating: 0, liked: true },
+    { monthBadge: null, day: 20, title: 'The Devil Wears Prada', released: 2006, rating: 4, liked: true },
+    { monthBadge: { month: 'MAR', year: 2024 }, day: 5, title: 'Eternal Sunshine of the Spotless Mind', released: 2004, rating: 5, liked: true },
+];
+
+// No "likes" feature exists on the backend yet either, so this tab is
+// genuinely empty (no fabricated rows) — just the filter chrome plus an
+// empty state, matching the real "no data yet" situation.
+const LIKES_FILTERS = ['Rating', 'Decade', 'Genre', 'Service', 'Sort by When Liked'];
+const LIKES_SUBTABS = ['Films', 'Reviews', 'Lists'];
+
+// No watchlist feature exists on the backend yet, so this is an honest
+// empty state (0 films) plus the filter/help chrome, not fabricated rows.
+const WATCHLIST_COUNT = 0;
+const WATCHLIST_FILTERS = ['Decade', 'Genre', 'Service', 'Sort by When Added'];
+
+// Network tab reuses the real friends/requests/suggestions backend (same
+// endpoints as the old standalone Members/Friends page) so we don't need a
+// separate page for it. Film/review counts per friend and the eye/grid/heart
+// stats on suggestions are still placeholders (no watch/review feature yet).
+const NETWORK_FILM_COUNT = 128;
+const NETWORK_REVIEW_COUNT = 34;
+const NETWORK_POSTER_COUNT = 4;
+const NETWORK_SUGGESTION_STATS = { eye: 1240, grid: 18, heart: 326 };
+
+const AVATAR_COLORS = ['#00b4a2', '#e85d75', '#f2b134', '#5b8def', '#9b59b6', '#2ecc71'];
+
+function colorForName(name) {
+    if (!name) return AVATAR_COLORS[0];
+    const code = name.charCodeAt(0) || 0;
+    return AVATAR_COLORS[code % AVATAR_COLORS.length];
+}
+
+function Avatar({ name, size = 44 }) {
+    const initial = name ? name.charAt(0).toUpperCase() : '?';
+    return (
+        <div
+            className="pp-avatar"
+            style={{ width: size, height: size, backgroundColor: colorForName(name), fontSize: size * 0.38 }}
+        >
+            {initial}
+        </div>
+    );
+}
+
+function HeartIcon() {
+    return (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z" />
+        </svg>
+    );
+}
+
+function EyeIcon() {
+    return (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 5c-7 0-10 7-10 7s3 7 10 7 10-7 10-7-3-7-10-7zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8z" />
+        </svg>
+    );
+}
+
+function GridIcon() {
+    return (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" />
+        </svg>
+    );
+}
+
+export default function ProfilePage() {
+    const [friendsCount, setFriendsCount] = useState(0);
+    const [loading, setLoading] = useState(true);
+    const [activeTab, setActiveTab] = useState('profile');
+    const [likesSubTab, setLikesSubTab] = useState('Films');
+
+    const [friends, setFriends] = useState([]);
+    const [pending, setPending] = useState([]);
+    const [sent, setSent] = useState([]);
+    const [suggestions, setSuggestions] = useState([]);
+    const [requestsTab, setRequestsTab] = useState('pending');
+    const [addUsername, setAddUsername] = useState('');
+    const [panelMessage, setPanelMessage] = useState('');
+
+    const tokenObj = localStorage.getItem('token');
+    const token = tokenObj ? JSON.parse(tokenObj).token : null;
+
+    const parseJwt = (t) => {
+        if (!t) return null;
+        try { return JSON.parse(atob(t.split('.')[1])); } catch (e) { return null; }
+    };
+
+    const decodedToken = parseJwt(token);
+    const username = decodedToken?.sub;
+    const authHeaders = { Authorization: `Bearer ${token}` };
+
+    const loadAll = () => {
+        if (!username) return;
+        Promise.all([
+            fetch(`${FRIENDS_BASE_URL}?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+            fetch(`${FRIENDS_BASE_URL}/pending?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+            fetch(`${FRIENDS_BASE_URL}/sent?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+            fetch(`${FRIENDS_BASE_URL}/suggestions?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+        ])
+            .then(([friendsList, pendingList, sentList, suggestionsList]) => {
+                setFriends(friendsList || []);
+                setFriendsCount((friendsList || []).length);
+                setPending(pendingList || []);
+                setSent(sentList || []);
+                setSuggestions(suggestionsList || []);
+            })
+            .finally(() => setLoading(false));
+    };
+
+    useEffect(() => {
+        if (!username) {
+            setLoading(false);
+            return;
+        }
+        loadAll();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [username]);
+
+    const handleSendRequest = (targetUsername) => {
+        const recipient = (targetUsername || addUsername).trim();
+        if (!recipient) return;
+        setPanelMessage('');
+        fetch(`${FRIENDS_BASE_URL}/request?actingUsername=${username}&targetUsername=${recipient}`, {
+            method: 'POST',
+            headers: authHeaders,
+        })
+            .then(r => {
+                if (!r.ok) throw new Error('Could not send request.');
+                setAddUsername('');
+                loadAll();
+            })
+            .catch(() => setPanelMessage('Could not send that request.'));
+    };
+
+    const handleAccept = (requestId) => {
+        fetch(`${FRIENDS_BASE_URL}/${requestId}/accept?actingUsername=${username}`, {
+            method: 'POST',
+            headers: authHeaders,
+        }).then(() => loadAll());
+    };
+
+    const handleDecline = (requestId) => {
+        fetch(`${FRIENDS_BASE_URL}/${requestId}/decline?actingUsername=${username}`, {
+            method: 'POST',
+            headers: authHeaders,
+        }).then(() => loadAll());
+    };
+
+    if (!username) {
+        return (
+            <div className="pp-page">
+                <main className="pp-main">
+                    <p className="pp-empty-state">Log in to view your profile.</p>
+                </main>
+            </div>
+        );
+    }
+
+    return (
+        <div className="pp-page">
+            <main className="pp-main">
+                <section className="pp-header-section">
+                    <div className="pp-header-left">
+                        <Avatar name={username} size={110} />
+                        <div className="pp-header-info">
+                            <h1 className="pp-display-name">{username}</h1>
+                            <div className="pp-header-actions">
+                                <button className="pp-edit-btn">Edit Profile</button>
+                                <button className="pp-more-btn" aria-label="More options">&hellip;</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="pp-stats">
+                        <div className="pp-stat-item">
+                            <span className="pp-stat-num">{PLACEHOLDER_FILMS_COUNT}</span>
+                            <span className="pp-stat-label">Films</span>
+                        </div>
+                        <div className="pp-stat-item">
+                            <span className="pp-stat-num">{loading ? '–' : friendsCount}</span>
+                            <span className="pp-stat-label">Friends</span>
+                        </div>
+                    </div>
+                </section>
+
+                <nav className="pp-tabs">
+                    <span
+                        className={`pp-tab ${activeTab === 'profile' ? 'pp-tab-active' : ''}`}
+                        onClick={() => setActiveTab('profile')}
+                    >
+                        Profile
+                    </span>
+                    <span
+                        className={`pp-tab ${activeTab === 'favorites' ? 'pp-tab-active' : ''}`}
+                        onClick={() => setActiveTab('favorites')}
+                    >
+                        Favorites
+                    </span>
+                    <span
+                        className={`pp-tab ${activeTab === 'diary' ? 'pp-tab-active' : ''}`}
+                        onClick={() => setActiveTab('diary')}
+                    >
+                        Diary
+                    </span>
+                    <span
+                        className={`pp-tab ${activeTab === 'likes' ? 'pp-tab-active' : ''}`}
+                        onClick={() => setActiveTab('likes')}
+                    >
+                        Likes
+                    </span>
+                    <span
+                        className={`pp-tab ${activeTab === 'watchlist' ? 'pp-tab-active' : ''}`}
+                        onClick={() => setActiveTab('watchlist')}
+                    >
+                        Watchlist
+                    </span>
+                    <span
+                        className={`pp-tab ${activeTab === 'network' ? 'pp-tab-active' : ''}`}
+                        onClick={() => setActiveTab('network')}
+                    >
+                        Network
+                    </span>
+                </nav>
+
+                {activeTab === 'profile' ? (
+                    <div className="pp-body">
+                        <div className="pp-body-left">
+                            <section className="pp-block">
+                                <div className="pp-block-header">
+                                    <span className="pp-block-title">Favorite Films</span>
+                                </div>
+                                <p className="pp-favorite-empty">
+                                    Don&apos;t forget to select your <strong>favorite films</strong>!
+                                </p>
+                            </section>
+
+                            <section className="pp-block">
+                                <div className="pp-block-header">
+                                    <span className="pp-block-title">Recent Activity</span>
+                                    <span className="pp-block-all">All</span>
+                                </div>
+                                <div className="pp-activity-grid">
+                                    {RECENT_ACTIVITY_GRID.map((item, i) => (
+                                        <div key={i} className="pp-activity-poster">
+                                            <div className="pp-poster-placeholder-lg" />
+                                            {item.type === 'like' && (
+                                                <span className="pp-poster-indicator pp-poster-like"><HeartIcon /></span>
+                                            )}
+                                            {item.type === 'rating' && (
+                                                <span className="pp-poster-indicator pp-poster-stars">
+                                                    {'★'.repeat(item.stars)}
+                                                </span>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </section>
+                        </div>
+
+                        <div className="pp-body-right">
+                            <section className="pp-block">
+                                <div className="pp-block-header">
+                                    <span className="pp-block-title">Activity</span>
+                                </div>
+                                <div className="pp-activity-feed">
+                                    {ACTIVITY_FEED_PLACEHOLDER.map((a, i) => (
+                                        <div key={i} className="pp-activity-row">
+                                            <span className="pp-activity-dot" />
+                                            <span className="pp-activity-text">{a.text}</span>
+                                            <span className="pp-activity-time">{a.time}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </section>
+                        </div>
+                    </div>
+                ) : activeTab === 'favorites' ? (
+                    <div className="pp-favorites">
+                        <div className="pp-favorites-header">
+                            <h2 className="pp-favorites-title">Favorites</h2>
+                            <div className="pp-favorites-actions">
+                                <button className="pp-fav-icon-btn" aria-label="Download">⬇</button>
+                                <button className="pp-fav-icon-btn" aria-label="Share">↗</button>
+                                <button className="pp-fav-all-btn">All Favorites</button>
+                            </div>
+                        </div>
+
+                        <section className="pp-fav-section">
+                            <div className="pp-fav-section-title">Movies ({FAVORITE_MOVIES_COUNT})</div>
+                            <div className="pp-fav-grid">
+                                {Array.from({ length: FAVORITE_MOVIES_COUNT }).map((_, i) => (
+                                    <div key={i} className="pp-fav-poster" />
+                                ))}
+                            </div>
+                        </section>
+
+                        <section className="pp-fav-section">
+                            <div className="pp-fav-section-title">Actors ({FAVORITE_ACTORS_COUNT})</div>
+                            <div className="pp-fav-grid">
+                                {Array.from({ length: FAVORITE_ACTORS_COUNT }).map((_, i) => (
+                                    <div key={i} className="pp-fav-actor" />
+                                ))}
+                            </div>
+                        </section>
+                    </div>
+                ) : activeTab === 'diary' ? (
+                    <div className="pp-diary">
+                        <div className="pp-diary-header">
+                            <h2 className="pp-diary-title">Diary</h2>
+                            <div className="pp-diary-filters">
+                                {DIARY_FILTERS.map((f) => (
+                                    <span key={f} className="pp-diary-filter">{f} ▾</span>
+                                ))}
+                                <span className="pp-diary-eye" aria-label="Toggle visibility">👁</span>
+                            </div>
+                        </div>
+
+                        <div className="pp-diary-table">
+                            <div className="pp-diary-row pp-diary-row-head">
+                                <span className="pp-diary-col-month">Month</span>
+                                <span className="pp-diary-col-day">Day</span>
+                                <span className="pp-diary-col-film">Film</span>
+                                <span className="pp-diary-col-released">Released</span>
+                                <span className="pp-diary-col-rating">Rating</span>
+                                <span className="pp-diary-col-like">Like</span>
+                                <span className="pp-diary-col-rewatch">Rewatch</span>
+                                <span className="pp-diary-col-review">Review</span>
+                                <span className="pp-diary-col-edit">Edit</span>
+                            </div>
+
+                            {DIARY_PLACEHOLDER.map((entry, i) => (
+                                <div key={i} className="pp-diary-row">
+                                    <span className="pp-diary-col-month">
+                                        {entry.monthBadge && (
+                                            <span className="pp-diary-month-badge">
+                                                <span>{entry.monthBadge.month}</span>
+                                                <span>{entry.monthBadge.year}</span>
+                                            </span>
+                                        )}
+                                    </span>
+                                    <span className="pp-diary-col-day">{entry.day}</span>
+                                    <span className="pp-diary-col-film pp-diary-film-cell">
+                                        <span className="pp-diary-poster" />
+                                        <span className="pp-diary-film-title">{entry.title}</span>
+                                    </span>
+                                    <span className="pp-diary-col-released">{entry.released}</span>
+                                    <span className="pp-diary-col-rating pp-diary-stars">
+                                        <span className="pp-diary-stars-filled">{'★'.repeat(entry.rating)}</span>
+                                        <span className="pp-diary-stars-empty">{'★'.repeat(5 - entry.rating)}</span>
+                                    </span>
+                                    <span className="pp-diary-col-like">
+                                        <span className={`pp-diary-heart ${entry.liked ? 'pp-diary-heart-filled' : ''}`}>
+                                            <HeartIcon />
+                                        </span>
+                                    </span>
+                                    <span className="pp-diary-col-rewatch" />
+                                    <span className="pp-diary-col-review" />
+                                    <span className="pp-diary-col-edit">
+                                        <span className="pp-diary-edit-icon">✎</span>
+                                        <span className="pp-diary-edit-icon">&hellip;</span>
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ) : activeTab === 'likes' ? (
+                    <div className="pp-likes">
+                        <div className="pp-likes-subtabs">
+                            {LIKES_SUBTABS.map((t) => (
+                                <span
+                                    key={t}
+                                    className={`pp-likes-subtab ${likesSubTab === t ? 'pp-likes-subtab-active' : ''}`}
+                                    onClick={() => setLikesSubTab(t)}
+                                >
+                                    {t}
+                                </span>
+                            ))}
+                        </div>
+
+                        <div className="pp-likes-filters-row">
+                            <div className="pp-likes-filters">
+                                {LIKES_FILTERS.map((f) => (
+                                    <span key={f} className="pp-diary-filter">{f} ▾</span>
+                                ))}
+                                <span className="pp-diary-eye" aria-label="Toggle visibility">👁</span>
+                            </div>
+                            <div className="pp-likes-view-toggle">
+                                <span className="pp-likes-view-icon pp-likes-view-icon-active" />
+                                <span className="pp-likes-view-icon" />
+                            </div>
+                        </div>
+
+                        <div className="pp-likes-empty-box">
+                            <p className="pp-likes-empty-text">No {likesSubTab.toLowerCase()} yet</p>
+                        </div>
+                    </div>
+                ) : activeTab === 'watchlist' ? (
+                    <div className="pp-watchlist-grid">
+                        <div className="pp-watchlist-left">
+                            <div className="pp-watchlist-title">You want to see {WATCHLIST_COUNT} films</div>
+                            <div className="pp-watchlist-filters-row">
+                                <div className="pp-likes-filters">
+                                    {WATCHLIST_FILTERS.map((f) => (
+                                        <span key={f} className="pp-diary-filter">{f} ▾</span>
+                                    ))}
+                                    <span className="pp-diary-eye" aria-label="Toggle visibility">👁</span>
+                                </div>
+                            </div>
+                            <div className="pp-likes-empty-box">
+                                <p className="pp-likes-empty-text">No films yet</p>
+                            </div>
+                        </div>
+
+                        <div className="pp-watchlist-right">
+                            <button className="pp-watchlist-action-btn">Make this list private</button>
+                            <button className="pp-watchlist-action-btn">Import films to watchlist&hellip;</button>
+
+                            <div className="pp-watchlist-info">
+                                <div className="pp-watchlist-subheading">How To Add</div>
+                                <p className="pp-watchlist-info-text">
+                                    Add films you want to see to your watchlist from the &bull;&bull;&bull; icon on
+                                    each film poster, or click the Watchlist icon in the actions panel on a film or
+                                    review page. Use the button above to import films to your watchlist using our{' '}
+                                    <strong>import format</strong>, up to a maximum of 1,900 films per file.
+                                </p>
+                            </div>
+
+                            <div className="pp-watchlist-info">
+                                <div className="pp-watchlist-subheading">Add a Film</div>
+                                <input className="pp-watchlist-search" placeholder="Search films..." />
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="pp-network">
+                        <div className="pp-network-row">
+                            <section className="pp-block pp-network-col">
+                                <div className="pp-kicker">Your Network</div>
+                                {friends.length === 0 ? (
+                                    <div className="pp-section-empty">You haven&apos;t added any friends yet.</div>
+                                ) : (
+                                    <div className="pp-network-scroll">
+                                        {friends.map((name) => (
+                                            <div key={name} className="pp-network-card">
+                                                <div className="pp-network-card-top">
+                                                    <Avatar name={name} size={64} />
+                                                    <span className="pp-network-name">{name}</span>
+                                                    <span className="pp-network-stats">
+                                                        {NETWORK_FILM_COUNT} films &bull; {NETWORK_REVIEW_COUNT} reviews
+                                                    </span>
+                                                </div>
+                                                <div className="pp-poster-row">
+                                                    {Array.from({ length: NETWORK_POSTER_COUNT }).map((_, i) => (
+                                                        <div key={i} className="pp-poster-placeholder" />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </section>
+
+                            <section className="pp-block pp-requests-col">
+                                <div className="pp-kicker">Requests</div>
+                                <div className="pp-requests-tabs">
+                                    <button
+                                        type="button"
+                                        className={`pp-tab-btn ${requestsTab === 'pending' ? 'pp-tab-btn-active' : ''}`}
+                                        onClick={() => setRequestsTab('pending')}
+                                    >
+                                        Pending ({pending.length})
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`pp-tab-btn ${requestsTab === 'sent' ? 'pp-tab-btn-active' : ''}`}
+                                        onClick={() => setRequestsTab('sent')}
+                                    >
+                                        Sent ({sent.length})
+                                    </button>
+                                </div>
+
+                                <form
+                                    className="pp-add-form"
+                                    onSubmit={(e) => { e.preventDefault(); handleSendRequest(); }}
+                                >
+                                    <input
+                                        className="pp-add-input"
+                                        placeholder="Add by username"
+                                        value={addUsername}
+                                        onChange={(e) => setAddUsername(e.target.value)}
+                                    />
+                                    <button type="submit" className="pp-add-btn">Send</button>
+                                </form>
+
+                                {panelMessage && <div className="pp-panel-message">{panelMessage}</div>}
+
+                                <div className="pp-requests-list">
+                                    {requestsTab === 'pending' ? (
+                                        pending.length === 0 ? (
+                                            <div className="pp-panel-empty">No incoming requests.</div>
+                                        ) : (
+                                            pending.map((req) => (
+                                                <div key={req.id} className="pp-panel-row">
+                                                    <Avatar name={req.requesterUsername} size={28} />
+                                                    <span className="pp-panel-row-name">{req.requesterUsername}</span>
+                                                    <div className="pp-panel-row-actions">
+                                                        <button className="pp-mini-btn pp-mini-accept" onClick={() => handleAccept(req.id)}>Accept</button>
+                                                        <button className="pp-mini-btn pp-mini-decline" onClick={() => handleDecline(req.id)}>Decline</button>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )
+                                    ) : sent.length === 0 ? (
+                                        <div className="pp-panel-empty">No sent requests.</div>
+                                    ) : (
+                                        sent.map((req) => (
+                                            <div key={req.id} className="pp-panel-row">
+                                                <Avatar name={req.recipientUsername} size={28} />
+                                                <span className="pp-panel-row-name">{req.recipientUsername}</span>
+                                                <span className="pp-pill">awaiting</span>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </section>
+                        </div>
+
+                        <section className="pp-block">
+                            <div className="pp-kicker">People you may know</div>
+                            {suggestions.length === 0 ? (
+                                <div className="pp-section-empty">No suggestions right now.</div>
+                            ) : (
+                                <div className="pp-suggestions-list">
+                                    {suggestions.map((s) => (
+                                        <div key={s.username} className="pp-suggestion-row">
+                                            <Avatar name={s.username} size={44} />
+                                            <div className="pp-suggestion-info">
+                                                <span className="pp-suggestion-name">{s.username}</span>
+                                                <span className="pp-suggestion-sub">
+                                                    {s.mutualFriendCount} mutual friend{s.mutualFriendCount === 1 ? '' : 's'}
+                                                </span>
+                                            </div>
+                                            <div className="pp-suggestion-stats">
+                                                <span className="pp-stat"><EyeIcon /> {NETWORK_SUGGESTION_STATS.eye}</span>
+                                                <span className="pp-stat"><GridIcon /> {NETWORK_SUGGESTION_STATS.grid}</span>
+                                                <span className="pp-stat"><HeartIcon /> {NETWORK_SUGGESTION_STATS.heart}</span>
+                                            </div>
+                                            <button className="pp-add-circle-btn" onClick={() => handleSendRequest(s.username)}>+</button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </section>
+                    </div>
+                )}
+            </main>
+        </div>
+    );
+}

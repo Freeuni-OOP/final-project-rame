@@ -1,0 +1,39 @@
+*   [33m9258666[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Merge pull request #10 from Freeuni-OOP/feat/header-frontend
+[31m|[m[32m\[m  
+[31m|[m * [33m7fee4d1[m[33m ([m[1;31morigin/Feat/header-frontend[m[33m)[m feat: added header with main tabs, search bar and profile/sign in
+[31m|[m * [33mc928cd4[m[33m ([m[1;31morigin/Feat/tracking-system[m[33m)[m fix: tracking connection from shows page
+* [32m|[m [33mf57eec7[m Merge pull request #8 from Freeuni-OOP/feat/tracking-system
+[33m|[m[32m\[m[32m|[m 
+[33m|[m * [33mb114cf2[m fix: test application.properties
+[33m|[m *   [33mf53b73b[m Merge remote-tracking branch 'origin/feat/tracking-system' into feat/tracking-system
+[33m|[m [35m|[m[36m\[m  
+[33m|[m [35m|[m *   [33m92e2da1[m Merge branch 'main' into feat/tracking-system
+[33m|[m [35m|[m [1;31m|[m[33m\[m  
+[33m|[m [35m|[m[33m_[m[1;31m|[m[33m/[m  
+[33m|[m[33m/[m[35m|[m [1;31m|[m   
+* [35m|[m [1;31m|[m   [33mba5647f[m Merge pull request #6 from Freeuni-OOP/feat/mainpage-frontend
+[1;33m|[m[1;34m\[m [35m\[m [1;31m\[m  
+* [1;34m\[m [35m\[m [1;31m\[m   [33m0ac96f7[m Merge pull request #7 from Freeuni-OOP/feat/changed-lambok
+[1;35m|[m[1;36m\[m [1;34m\[m [35m\[m [1;31m\[m  
+[1;35m|[m * [1;34m|[m [35m|[m [1;31m|[m [33m22c9765[m[33m ([m[1;31morigin/Feat/changed-lambok[m[33m)[m fix: changed lambook
+[1;35m|[m[1;35m/[m [1;34m/[m [35m/[m [1;31m/[m  
+* [1;34m|[m [35m|[m [1;31m|[m   [33ma3e8f83[m Merge pull request #4 from Freeuni-OOP/Feat/Social-Integration-Friends
+[31m|[m[32m\[m [1;34m\[m [35m\[m [1;31m\[m  
+[31m|[m * [1;34m|[m [35m|[m [1;31m|[m [33me258b90[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mFeat/Social-Integration-Friends[m[33m, [m[1;31morigin/Feat/Social-Integration-Friends[m[33m)[m Fix, დავამატე Lombok Dependency_V2
+[31m|[m * [1;34m|[m [35m|[m [1;31m|[m [33m449094c[m Fix, დავამატე Lombok Dependency
+[31m|[m * [1;34m|[m [35m|[m [1;31m|[m   [33m0a75d02[m Merge branch 'main' into Feat/Social-Integration-Friends
+[31m|[m [33m|[m[31m\[m [1;34m\[m [35m\[m [1;31m\[m  
+[31m|[m [33m|[m[31m/[m [1;34m/[m [35m/[m [1;31m/[m  
+[31m|[m[31m/[m[33m|[m [1;34m|[m [35m|[m [1;31m|[m   
+[31m|[m [33m|[m [1;34m|[m * [1;31m|[m [33m364d17f[m added tracking tests
+[31m|[m [33m|[m [1;34m|[m [1;31m|[m[1;31m/[m  
+[31m|[m [33m|[m [1;34m|[m * [33ma500036[m feat: add favorite icon too, and episodes tracking. corrected frontend.
+[31m|[m [33m|[m [1;34m|[m *   [33m3d57a05[m Merge branch 'feat/mainpage-frontend' into feat/tracking-system
+[31m|[m [33m|[m [1;34m|[m [35m|[m[1;34m\[m  
+[31m|[m [33m|[m [1;34m|[m [35m|[m[1;34m/[m  
+[31m|[m [33m|[m [1;34m|[m[1;34m/[m[35m|[m   
+[31m|[m [33m|[m * [35m|[m [33md2e082f[m[33m ([m[1;31morigin/Feat/mainpage-frontend[m[33m)[m feat: added Trending and Popular Sections + Genre Filter to ShowPage
+[31m|[m [33m|[m [36m|[m * [33ma88fcfe[m feat: added series tracking back and ugly frontend
+[31m|[m [33m|[m [36m|[m * [33m404b71e[m feat: added series tracking back and ugly frontend
+[31m|[m [33m|[m[31m_[m[36m|[m[31m/[m  
+[31m|[m[31m/[m[33m|[m [36m|[m   
