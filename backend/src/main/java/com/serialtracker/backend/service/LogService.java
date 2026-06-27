@@ -32,7 +32,43 @@ public class LogService {
                 .orElseThrow(() -> new RuntimeException("User not found: " + req.getUsername()));
         Long userId = user.getId();
 
-        // 1) show-level: rating / review / liked / status / rewatch / watchDate
+        boolean isWholeShow = Boolean.TRUE.equals(req.getWholeShow());
+        boolean isEpisode = !isWholeShow
+                && req.getSeasonNumber() != null && req.getEpisodeNumber() != null;
+
+        // ─────────────────────────────────────────────
+        // A) კონკრეტული ეპიზოდი — რივიუ/რეიტინგი ეპიზოდზე
+        // ─────────────────────────────────────────────
+        if (isEpisode) {
+            // 1) ჯერ შოუს სტატუსი → WATCHING (მხოლოდ status, რივიუ/რეიტინგი არა)
+            UserShowStatus showStatus = showStatusRepository
+                    .findByUserIdAndShowId(userId, req.getShowId())
+                    .orElse(new UserShowStatus(userId, req.getShowId(), SeriesStatus.WATCHING));
+            showStatus.setStatus(SeriesStatus.WATCHING);
+            showStatusRepository.save(showStatus);
+
+            // 2) რივიუ/რეიტინგი/like/rewatch/watchDate → ეპიზოდზე
+            UserEpisodeStatus ep = episodeStatusRepository
+                    .findByUserIdAndShowIdAndSeasonNumberAndEpisodeNumber(
+                            userId, req.getShowId(), req.getSeasonNumber(), req.getEpisodeNumber())
+                    .orElse(new UserEpisodeStatus(
+                            userId, req.getShowId(), req.getSeasonNumber(), req.getEpisodeNumber()));
+
+            if (req.getRating() > 0) ep.setRating(req.getRating());
+            if (req.getReview() != null) ep.setReview(req.getReview());
+            if (req.getLiked() != null) ep.setLiked(req.getLiked());
+            if (req.getRewatch() != null) ep.setRewatch(req.getRewatch());
+            if (req.getWatchDate() != null && !req.getWatchDate().isEmpty()) {
+                ep.setWatchDate(LocalDate.parse(req.getWatchDate()));
+            }
+
+            episodeStatusRepository.save(ep);
+            return;
+        }
+
+        // ─────────────────────────────────────────────
+        // B) Whole Show (ან სეზონი/ეპიზოდი არ აირჩა) — რივიუ/რეიტინგი შოუზე
+        // ─────────────────────────────────────────────
         UserShowStatus status = showStatusRepository
                 .findByUserIdAndShowId(userId, req.getShowId())
                 .orElse(new UserShowStatus(userId, req.getShowId(), SeriesStatus.WATCHING));
@@ -40,32 +76,15 @@ public class LogService {
         if (req.getRating() > 0) status.setRating(req.getRating());
         if (req.getReview() != null) status.setReview(req.getReview());
         if (req.getLiked() != null) status.setFavorite(req.getLiked());
-
-        // 🌟 ახალი: rewatch + watchDate
         if (req.getRewatch() != null) status.setRewatch(req.getRewatch());
         if (req.getWatchDate() != null && !req.getWatchDate().isEmpty()) {
             status.setWatchDate(LocalDate.parse(req.getWatchDate()));
         }
 
-        // 🌟 სტატუსის ლოგიკა
-        if (Boolean.TRUE.equals(req.getWholeShow())) {
-            status.setStatus(SeriesStatus.COMPLETED);   // მთელი სერიალი ნანახია
-        } else if (req.getSeasonNumber() != null && req.getEpisodeNumber() != null) {
-            status.setStatus(SeriesStatus.WATCHING);     // კონკრეტული ეპიზოდი — ჯერ უყურებს
+        if (isWholeShow) {
+            status.setStatus(SeriesStatus.COMPLETED);
         }
 
         showStatusRepository.save(status);
-
-        // 2) episode-level: ნანახი ეპიზოდი (მხოლოდ თუ კონკრეტული ეპიზოდია, არა Whole Show)
-        if (!Boolean.TRUE.equals(req.getWholeShow())
-                && req.getSeasonNumber() != null && req.getEpisodeNumber() != null) {
-            boolean exists = episodeStatusRepository
-                    .existsByUserIdAndShowIdAndSeasonNumberAndEpisodeNumber(
-                            userId, req.getShowId(), req.getSeasonNumber(), req.getEpisodeNumber());
-            if (!exists) {
-                episodeStatusRepository.save(new UserEpisodeStatus(
-                        userId, req.getShowId(), req.getSeasonNumber(), req.getEpisodeNumber()));
-            }
-        }
     }
 }
