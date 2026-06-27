@@ -60,4 +60,9 @@ public class TMDBService {
         String url = baseUrl + "/trending/tv/week?api_key=" + apiKey;
         return restTemplate.getForObject(url, String.class);
     }
+
+    public String getShowsByGenre(String genreId, int page) {
+        String url = "https://api.themoviedb.org/3/discover/tv?api_key=" + apiKey + "&with_genres=" + genreId + "&page=" + page;
+        return restTemplate.getForObject(url, String.class);
+    }
 }

@@ -8,12 +8,14 @@ import com.serialtracker.backend.repository.UserRepository;
 import com.serialtracker.backend.repository.UserShowStatusRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import jakarta.transaction.Transactional;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/tracking")
 @CrossOrigin(origins = "http://localhost:5173")
+@Transactional
 public class UserTrackingController {
 
     private final UserShowStatusRepository statusRepository;
@@ -32,19 +34,58 @@ public class UserTrackingController {
     public ResponseEntity<?> updateShowStatus(
             @RequestParam String username,
             @RequestParam int showId,
-            @RequestParam SeriesStatus status) {
-
+            @RequestParam(required = false) String status) {
 
         Long userId = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"))
                 .getId();
 
+        // 🟢 ვეძებთ ძველს, თუ არ არის, ვქმნით სუფთად
         UserShowStatus showStatus = statusRepository.findByUserIdAndShowId(userId, showId)
-                .orElse(new UserShowStatus(userId, showId, status));
+                .orElseGet(() -> {
+                    UserShowStatus newStatusObj = new UserShowStatus();
+                    newStatusObj.setUserId(userId);
+                    newStatusObj.setShowId(showId);
+                    newStatusObj.setFavorite(false);
+                    return newStatusObj;
+                });
 
-        showStatus.setStatus(status);
-        statusRepository.save(showStatus);
-        return ResponseEntity.ok("Show status updated to: " + status);
+        if (status == null || status.trim().isEmpty() || status.equals("null")) {
+            showStatus.setStatus(null);
+            statusRepository.save(showStatus);
+            return ResponseEntity.ok("Show status cleared (set to null)");
+        } else {
+            SeriesStatus seriesStatus = SeriesStatus.valueOf(status.toUpperCase());
+            showStatus.setStatus(seriesStatus);
+            statusRepository.save(showStatus);
+            return ResponseEntity.ok("Show status updated to: " + seriesStatus);
+        }
+    }
+
+    @PostMapping("/watch-all-episodes")
+    public ResponseEntity<?> watchAllEpisodes(
+            @RequestParam String username,
+            @RequestParam int showId) {
+
+        Long userId = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"))
+                .getId();
+
+        episodeRepository.deleteByUserIdAndShowId(userId, showId);
+        return ResponseEntity.ok("All episodes marked as watched");
+    }
+
+    @PostMapping("/unwatch-all-episodes")
+    public ResponseEntity<?> unwatchAllEpisodes(
+            @RequestParam String username,
+            @RequestParam int showId) {
+
+        Long userId = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"))
+                .getId();
+
+        episodeRepository.deleteByUserIdAndShowId(userId, showId);
+        return ResponseEntity.ok("All episodes marked as unwatched");
     }
 
     @PostMapping("/toggle-episode")
@@ -104,14 +145,18 @@ public class UserTrackingController {
                 .getId();
 
         UserShowStatus showStatus = statusRepository.findByUserIdAndShowId(userId, showId)
-                .orElse(new UserShowStatus(userId, showId, null));
-
+                .orElseGet(() -> {
+                    UserShowStatus newStatusObj = new UserShowStatus();
+                    newStatusObj.setUserId(userId);
+                    newStatusObj.setShowId(showId);
+                    newStatusObj.setStatus(null);
+                    newStatusObj.setFavorite(false);
+                    return newStatusObj;
+                });
 
         showStatus.setFavorite(!showStatus.isFavorite());
         statusRepository.save(showStatus);
 
         return ResponseEntity.ok(showStatus.isFavorite());
     }
-
-
 }

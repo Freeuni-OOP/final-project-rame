@@ -76,4 +76,13 @@ public class ShowController {
             return ResponseEntity.badRequest().body("Failed to recommend show: " + e.getMessage());
         }
     }
+
+    @GetMapping(value = "/genre", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<String> getByGenre(
+            @RequestParam String genreId,
+            @RequestParam(defaultValue = "1") int page) {
+        return ResponseEntity.ok(tmdbService.getShowsByGenre(genreId, page));
+    }
+
+
 }

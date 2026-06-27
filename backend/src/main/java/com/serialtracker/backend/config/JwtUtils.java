@@ -12,11 +12,9 @@ import java.util.Date;
 public class JwtUtils {
 
     private final SecretKey jwtSecret = Keys.secretKeyFor(SignatureAlgorithm.HS256);
-
-    // token lifespan
     private final int jwtExpirationMs = 86400000;
 
-    // function which creates token from username
+    // ტოკენის გენერირება
     public String generateJwtToken(String username) {
         return Jwts.builder()
                 .setSubject(username)
@@ -24,5 +22,28 @@ public class JwtUtils {
                 .setExpiration(new Date((new Date()).getTime() + jwtExpirationMs))
                 .signWith(jwtSecret)
                 .compact();
+    }
+
+
+    public String getUsernameFromJwtToken(String token) {
+        return Jwts.parser()
+                .verifyWith(jwtSecret)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload()
+                .getSubject();
+    }
+
+    public boolean validateJwtToken(String authToken) {
+        try {
+            Jwts.parser()
+                    .verifyWith(jwtSecret)
+                    .build()
+                    .parseSignedClaims(authToken);
+            return true;
+        } catch (Exception e) {
+            System.out.println("Invalid JWT token: " + e.getMessage());
+        }
+        return false;
     }
 }
