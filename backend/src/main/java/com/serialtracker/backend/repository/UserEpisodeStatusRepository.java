@@ -10,4 +10,5 @@ public interface UserEpisodeStatusRepository extends JpaRepository<UserEpisodeSt
             Long userId, int showId, int seasonNumber, int episodeNumber);
 
     List<UserEpisodeStatus> findByUserIdAndShowId(Long userId, int showId);
+    void deleteByUserIdAndShowId(Long userId, int showId);
 }

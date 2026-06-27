@@ -57,4 +57,13 @@ public class ShowController {
             @PathVariable int episodeNumber) {
         return ResponseEntity.ok(tmdbService.getEpisodeDetails(id, seasonNumber, episodeNumber));
     }
+
+    @GetMapping(value = "/genre", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<String> getByGenre(
+            @RequestParam String genreId,
+            @RequestParam(defaultValue = "1") int page) {
+        return ResponseEntity.ok(tmdbService.getShowsByGenre(genreId, page));
+    }
+
+    
 }
