@@ -37,17 +37,23 @@ public class LogService {
                 && req.getSeasonNumber() != null && req.getEpisodeNumber() != null;
 
         // ─────────────────────────────────────────────
-        // A) კონკრეტული ეპიზოდი — რივიუ/რეიტინგი ეპიზოდზე
+        // A) კონკრეტული ეპიზოდი
         // ─────────────────────────────────────────────
         if (isEpisode) {
-            // 1) ჯერ შოუს სტატუსი → WATCHING (მხოლოდ status, რივიუ/რეიტინგი არა)
+            // 1) შოუს ცხრილში: status = WATCHING + rewatch + watchDate
+            //    (rating / review / liked — არა, ისინი მხოლოდ ეპიზოდზე)
             UserShowStatus showStatus = showStatusRepository
                     .findByUserIdAndShowId(userId, req.getShowId())
                     .orElse(new UserShowStatus(userId, req.getShowId(), SeriesStatus.WATCHING));
+
             showStatus.setStatus(SeriesStatus.WATCHING);
+            if (req.getRewatch() != null) showStatus.setRewatch(req.getRewatch());
+            if (req.getWatchDate() != null && !req.getWatchDate().isEmpty()) {
+                showStatus.setWatchDate(LocalDate.parse(req.getWatchDate()));
+            }
             showStatusRepository.save(showStatus);
 
-            // 2) რივიუ/რეიტინგი/like/rewatch/watchDate → ეპიზოდზე
+            // 2) ეპიზოდის ცხრილში: rating / review / liked / rewatch / watchDate
             UserEpisodeStatus ep = episodeStatusRepository
                     .findByUserIdAndShowIdAndSeasonNumberAndEpisodeNumber(
                             userId, req.getShowId(), req.getSeasonNumber(), req.getEpisodeNumber())
@@ -67,7 +73,7 @@ public class LogService {
         }
 
         // ─────────────────────────────────────────────
-        // B) Whole Show (ან სეზონი/ეპიზოდი არ აირჩა) — რივიუ/რეიტინგი შოუზე
+        // B) Whole Show (ან სეზონი/ეპიზოდი არ აირჩა) — ყველაფერი შოუზე
         // ─────────────────────────────────────────────
         UserShowStatus status = showStatusRepository
                 .findByUserIdAndShowId(userId, req.getShowId())

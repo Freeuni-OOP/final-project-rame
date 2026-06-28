@@ -13,7 +13,8 @@ public class UserEpisodeStatus {
     private int showId;
     private int seasonNumber;
     private int episodeNumber;
-    private int rating;
+    @Column(nullable = true)
+    private Integer rating;
 
     @Column(columnDefinition = "TEXT")
     private String review;
@@ -28,6 +29,7 @@ public class UserEpisodeStatus {
         this.showId = showId;
         this.seasonNumber = seasonNumber;
         this.episodeNumber = episodeNumber;
+        this.rating = null; // 🟢 ახალი სტატუსის შექმნისას რეიტინგი თავიდან ცარიელია
     }
 
     public Long getId() { return id; }

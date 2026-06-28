@@ -58,6 +58,25 @@ public class ShowController {
         return ResponseEntity.ok(tmdbService.getEpisodeDetails(id, seasonNumber, episodeNumber));
     }
 
+    // ახალი ენდპოინტი სერიალის მეგობრისთვის რეკომენდაციისთვის
+    @PostMapping("/{id}/recommend")
+    public ResponseEntity<?> recommendShow(
+            @PathVariable int id,
+            @RequestParam String senderUsername,
+            @RequestParam String targetUsername) {
+        try {
+            // აქ დროებით უბრალოდ დავბეჭდოთ კონსოლში იმიტაციისთვის
+            System.out.println("RECOMMENDATION: User '" + senderUsername +
+                    "' recommended Show ID: " + id + " to User '" + targetUsername + "'");
+
+            // მომავალში აქ ჩაჯდება სერვისის გამოძახება, მაგ: recommendationService.send(...)
+
+            return ResponseEntity.ok("Show recommended successfully to " + targetUsername);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Failed to recommend show: " + e.getMessage());
+        }
+    }
+
     @GetMapping(value = "/genre", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<String> getByGenre(
             @RequestParam String genreId,
@@ -65,5 +84,5 @@ public class ShowController {
         return ResponseEntity.ok(tmdbService.getShowsByGenre(genreId, page));
     }
 
-    
+
 }
