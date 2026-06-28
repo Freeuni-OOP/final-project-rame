@@ -11,4 +11,6 @@ public interface UserShowStatusRepository extends JpaRepository<UserShowStatus, 
     Optional<UserShowStatus> findByUserIdAndShowId(Long userId, int showId);
 
     List<UserShowStatus> findByUserIdAndStatus(Long userId, SeriesStatus status);
+
+    List<UserShowStatus> findByUserIdAndStatusOrderByIdDesc(Long userId, SeriesStatus status);
 }

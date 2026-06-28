@@ -565,10 +565,8 @@
 }
 
 /* ---------- watchlist tab ---------- */
-.pp-watchlist-grid {
-    display: grid;
-    grid-template-columns: 2.2fr 1fr;
-    gap: 40px;
+.pp-watchlist-solo {
+    width: 100%;
 }
 
 .pp-watchlist-title {
@@ -579,73 +577,7 @@
     letter-spacing: 1px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     padding-bottom: 12px;
-    margin-bottom: 10px;
-}
-
-.pp-watchlist-filters-row {
-    display: flex;
-    justify-content: flex-end;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    padding-bottom: 12px;
     margin-bottom: 18px;
-}
-
-.pp-watchlist-action-btn {
-    display: block;
-    width: 100%;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    color: #dce6ef;
-    font-weight: 700;
-    font-size: 0.85rem;
-    border-radius: 5px;
-    padding: 12px 14px;
-    cursor: pointer;
-    margin-bottom: 10px;
-}
-
-.pp-watchlist-action-btn:hover {
-    background: rgba(255, 255, 255, 0.14);
-}
-
-.pp-watchlist-info {
-    margin-top: 24px;
-}
-
-.pp-watchlist-subheading {
-    color: #5f758a;
-    font-size: 0.78rem;
-    font-weight: 700;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    padding-bottom: 10px;
-    margin-bottom: 12px;
-}
-
-.pp-watchlist-info-text {
-    color: #7c93a8;
-    font-size: 0.85rem;
-    line-height: 1.6;
-}
-
-.pp-watchlist-info-text strong {
-    color: #dce6ef;
-}
-
-.pp-watchlist-search {
-    width: 100%;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 6px;
-    color: #ffffff;
-    padding: 10px 12px;
-    font-size: 0.85rem;
-    outline: none;
-}
-
-.pp-watchlist-search::placeholder {
-    color: #5f758a;
 }
 
 /* ---------- network tab ---------- */
@@ -928,7 +860,7 @@
 
 /* ---------- responsive ---------- */
 @media (max-width: 880px) {
-    .pp-body, .pp-watchlist-grid, .pp-network-row {
+    .pp-body, .pp-network-row {
         grid-template-columns: 1fr;
     }
 }
@@ -966,7 +898,7 @@
 /* ---------- watchlist poster grid (real PLAN_TO_WATCH data) ---------- */
 .pp-watchlist-poster-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 22px 16px;
     margin-top: 4px;
 }
@@ -1032,6 +964,12 @@
 .pp-watchlist-poster-year {
     color: #5f758a;
     font-size: 0.75rem;
+}
+
+@media (max-width: 1100px) {
+    .pp-watchlist-poster-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
 }
 
 @media (max-width: 880px) {

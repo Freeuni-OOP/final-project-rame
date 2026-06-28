@@ -145,7 +145,7 @@ public class UserTrackingController {
                 .orElseThrow(() -> new RuntimeException("User not found"))
                 .getId();
 
-        List<Integer> showIds = statusRepository.findByUserIdAndStatus(userId, SeriesStatus.PLAN_TO_WATCH)
+        List<Integer> showIds = statusRepository.findByUserIdAndStatusOrderByIdDesc(userId, SeriesStatus.PLAN_TO_WATCH)
                 .stream()
                 .map(UserShowStatus::getShowId)
                 .toList();

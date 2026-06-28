@@ -49,9 +49,8 @@ const LIKES_FILTERS = ['Rating', 'Decade', 'Genre', 'Service', 'Sort by When Lik
 const LIKES_SUBTABS = ['Films', 'Reviews', 'Lists'];
 
 // Watchlist is backed by the real "PLAN_TO_WATCH" show status (set from the
-// star icon on a show/details page). Filters below are still chrome-only —
-// no sort/filter backend for this view yet.
-const WATCHLIST_FILTERS = ['Decade', 'Genre', 'Service', 'Sort by When Added'];
+// star icon on a show/details page). Backend already returns it newest-added
+// first, so there's no separate sort/filter UI for this view.
 const POSTER_BASE = 'https://image.tmdb.org/t/p/w342';
 
 // Network tab reuses the real friends/requests/suggestions backend (same
@@ -559,79 +558,49 @@ export default function ProfilePage() {
                         </div>
                     </div>
                 ) : activeTab === 'watchlist' ? (
-                    <div className="pp-watchlist-grid">
-                        <div className="pp-watchlist-left">
-                            <div className="pp-watchlist-title">You want to see {watchlistShowIds.length} film{watchlistShowIds.length === 1 ? '' : 's'}</div>
-                            <div className="pp-watchlist-filters-row">
-                                <div className="pp-likes-filters">
-                                    {WATCHLIST_FILTERS.map((f) => (
-                                        <span key={f} className="pp-diary-filter">{f} ▾</span>
-                                    ))}
-                                    <span className="pp-diary-eye" aria-label="Toggle visibility">👁</span>
-                                </div>
-                            </div>
+                    <div className="pp-watchlist-solo">
+                        <div className="pp-watchlist-title">You want to see {watchlistShowIds.length} film{watchlistShowIds.length === 1 ? '' : 's'}</div>
 
-                            {watchlistShowIds.length === 0 ? (
-                                <div className="pp-likes-empty-box">
-                                    <p className="pp-likes-empty-text">No films yet</p>
-                                </div>
-                            ) : (
-                                <div className="pp-watchlist-poster-grid">
-                                    {watchlistShowIds.map((showId) => {
-                                        const info = watchlistInfo[showId];
-                                        return (
-                                            <div key={showId} className="pp-watchlist-poster-item">
-                                                {info?.poster_path ? (
-                                                    <img
-                                                        src={`${POSTER_BASE}${info.poster_path}`}
-                                                        alt={info?.name || ''}
-                                                        className="pp-watchlist-poster"
-                                                        onClick={() => navigate(`/shows/${showId}`)}
-                                                    />
-                                                ) : (
-                                                    <div
-                                                        className="pp-watchlist-poster pp-watchlist-poster-placeholder"
-                                                        onClick={() => navigate(`/shows/${showId}`)}
-                                                    />
-                                                )}
-                                                <button
-                                                    type="button"
-                                                    className="pp-watchlist-remove-btn"
-                                                    title="Remove from watchlist"
-                                                    onClick={() => handleRemoveFromWatchlist(showId)}
-                                                >
-                                                    ✕
-                                                </button>
-                                                <div className="pp-watchlist-poster-caption">
-                                                    <span className="pp-watchlist-poster-title">{info?.name || `Show #${showId}`}</span>
-                                                    {info?.year && <span className="pp-watchlist-poster-year">{info.year}</span>}
-                                                </div>
+                        {watchlistShowIds.length === 0 ? (
+                            <div className="pp-likes-empty-box">
+                                <p className="pp-likes-empty-text">No films yet</p>
+                            </div>
+                        ) : (
+                            <div className="pp-watchlist-poster-grid">
+                                {watchlistShowIds.map((showId) => {
+                                    const info = watchlistInfo[showId];
+                                    return (
+                                        <div key={showId} className="pp-watchlist-poster-item">
+                                            {info?.poster_path ? (
+                                                <img
+                                                    src={`${POSTER_BASE}${info.poster_path}`}
+                                                    alt={info?.name || ''}
+                                                    className="pp-watchlist-poster"
+                                                    onClick={() => navigate(`/shows/${showId}`)}
+                                                />
+                                            ) : (
+                                                <div
+                                                    className="pp-watchlist-poster pp-watchlist-poster-placeholder"
+                                                    onClick={() => navigate(`/shows/${showId}`)}
+                                                />
+                                            )}
+                                            <button
+                                                type="button"
+                                                className="pp-watchlist-remove-btn"
+                                                title="Remove from watchlist"
+                                                onClick={() => handleRemoveFromWatchlist(showId)}
+                                            >
+                                                ✕
+                                            </button>
+                                            <div className="pp-watchlist-poster-caption">
+                                                <span className="pp-watchlist-poster-title">{info?.name || `Show #${showId}`}</span>
+                                                {info?.year && <span className="pp-watchlist-poster-year">{info.year}</span>}
                                             </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="pp-watchlist-right">
-                            <button className="pp-watchlist-action-btn">Make this list private</button>
-                            <button className="pp-watchlist-action-btn">Import films to watchlist&hellip;</button>
-
-                            <div className="pp-watchlist-info">
-                                <div className="pp-watchlist-subheading">How To Add</div>
-                                <p className="pp-watchlist-info-text">
-                                    Add films you want to see to your watchlist from the &bull;&bull;&bull; icon on
-                                    each film poster, or click the Watchlist icon in the actions panel on a film or
-                                    review page. Use the button above to import films to your watchlist using our{' '}
-                                    <strong>import format</strong>, up to a maximum of 1,900 films per file.
-                                </p>
+                                        </div>
+                                    );
+                                })}
                             </div>
-
-                            <div className="pp-watchlist-info">
-                                <div className="pp-watchlist-subheading">Add a Film</div>
-                                <input className="pp-watchlist-search" placeholder="Search films..." />
-                            </div>
-                        </div>
+                        )}
                     </div>
                 ) : (
                     <div className="pp-network">
