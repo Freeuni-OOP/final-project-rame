@@ -1,0 +1,136 @@
+.recommend-wrapper {
+    display: inline-block;
+    margin-top: 10px;
+}
+
+/* ✉️ პრემიუმ ნეონის ღილაკი სერიალის გვერდისთვის */
+.recommend-main-btn {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(0, 255, 213, 0.25);
+    color: #00ffd5;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.25s ease-in-out;
+}
+
+.recommend-main-btn:hover {
+    background: #00ffd5;
+    color: #0d1117;
+    box-shadow: 0 0 15px rgba(0, 255, 213, 0.35);
+    transform: translateY(-1px);
+}
+
+/* ოვერლეი */
+.rec-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+/* მოდალური ბლოკი */
+.rec-modal {
+    background: rgba(18, 22, 30, 0.98);
+    border: 1px solid rgba(0, 255, 213, 0.15);
+    border-radius: 16px;
+    width: 380px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+}
+
+.rec-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.rec-header h3 {
+    margin: 0;
+    font-size: 16px;
+    color: #fff;
+}
+
+.rec-neon-title { color: #00ffd5; }
+
+.rec-close {
+    background: none;
+    border: none;
+    color: #8b949e;
+    font-size: 16px;
+    cursor: pointer;
+}
+.rec-close:hover { color: #ff4444; }
+
+.rec-search {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 10px 14px;
+    color: #fff;
+    outline: none;
+    font-size: 13px;
+}
+.rec-search:focus { border-color: #00ffd5; }
+
+.rec-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.rec-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.01);
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+.rec-user-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.rec-avatar { font-size: 16px; }
+.rec-username { color: #c9d1d9; font-size: 13px; }
+
+.rec-action-btn {
+    background: rgba(0, 255, 213, 0.08);
+    border: 1px solid #00ffd5;
+    color: #00ffd5;
+    padding: 5px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.rec-action-btn:hover { background: #00ffd5; color: #0d1117; }
+
+.rec-action-btn.sent {
+    background: rgba(255, 255, 255, 0.04) !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+    color: #58a6ff !important;
+    cursor: not-allowed;
+}
+
+.rec-empty { text-align: center; color: #8b949e; font-size: 13px; padding: 10px; }
+

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import '../style/ShowsDetailsPage.css';
+import RecommendButton from '../components/RecommendButton';
 
 function ShowsDetailsPage() {
     const { id } = useParams();
@@ -266,6 +267,8 @@ function ShowsDetailsPage() {
 
                             <button className="design-btn log-btn">➕ LOG</button>
                             <button className="design-btn list-btn">Add to list</button>
+
+                            <RecommendButton showId={showData.id} showName={showData.name} />
                         </div>
                     )}
                 </aside>

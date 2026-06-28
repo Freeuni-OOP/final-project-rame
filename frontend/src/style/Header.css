@@ -1,178 +1,302 @@
+/* ==========================================================================
+   🌐 MAIN NAVIGATION HEADER STYLES
+   ========================================================================== */
+
 .main-header {
-    width: 100%;
-    background: rgba(18, 24, 31, 0.85); /* მუქი ფონი */
-    backdrop-filter: blur(10px);
+    background-color: #0c111c;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    position: fixed;
+    position: sticky;
     top: 0;
-    left: 0;
-    z-index: 1000;
-    padding: 0 2rem;
+    z-index: 9999;
+    padding: 10px 0;
+    width: 100%;
 }
 
 .header-container {
-    max-width: 1300px;
-    height: 70px;
+    max-width: 1200px;
     margin: 0 auto;
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
 }
 
+/* --- Left Section (Logo & Nav) --- */
 .header-left {
     display: flex;
     align-items: center;
-    gap: 3rem;
+    gap: 30px;
 }
 
 .header-logo {
-    font-size: 1.5rem;
+    font-size: 22px;
     font-weight: 800;
-    color: #ffffff;
+    color: #fff;
     text-decoration: none;
     letter-spacing: 1.5px;
+    transition: color 0.2s ease;
+}
+
+.header-logo:hover {
+    color: #00ffd5;
 }
 
 .header-nav {
     display: flex;
     align-items: center;
-    gap: 2rem;
+    gap: 20px;
 }
 
 .nav-item {
-    color: #9aabbc;
+    color: #9ab3c8;
     text-decoration: none;
-    font-size: 1rem;
+    font-size: 14px;
     font-weight: 500;
     transition: color 0.2s ease;
 }
 
 .nav-item:hover {
-    color: #ffffff;
+    color: #fff;
 }
 
+/* --- Middle Section (Search Bar) --- */
+.header-middle {
+    flex: 1;
+    max-width: 450px;
+    margin: 0 25px;
+}
+
+.header-search-form {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+.glass-input-header {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 8px 14px;
+    color: #fff;
+    font-size: 13px;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+.glass-input-header:focus {
+    border-color: rgba(0, 255, 213, 0.4);
+    background: rgba(255, 255, 255, 0.05);
+    box-shadow: 0 0 10px rgba(0, 255, 213, 0.1);
+}
+
+.neon-button-header {
+    background: transparent;
+    border: 1px solid #00ffd5;
+    color: #00ffd5;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.neon-button-header:hover {
+    background: #00ffd5;
+    color: #0c111c;
+    box-shadow: 0 0 12px rgba(0, 255, 213, 0.4);
+}
+
+/* --- Right Section (User Actions & Profile) --- */
 .header-right {
     display: flex;
     align-items: center;
-    gap: 1.5rem;
+    gap: 20px;
 }
 
 .header-log-btn {
-    background-color: #00b4a2;
-    color: #12181f;
-    border: none;
-    padding: 0.5rem 1.2rem;
+    background: rgba(0, 255, 213, 0.06);
+    border: 1px solid rgba(0, 255, 213, 0.2);
+    color: #00ffd5;
+    padding: 6px 14px;
     border-radius: 20px;
-    font-weight: 700;
-    font-size: 0.85rem;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 6px;
     cursor: pointer;
-    transition: transform 0.2s ease, background-color 0.2s ease;
+    transition: all 0.2s ease;
 }
 
 .header-log-btn:hover {
-    background-color: #00d1bc;
-    transform: scale(1.03);
+    background: rgba(0, 255, 213, 0.15);
+    border-color: #00ffd5;
 }
 
 .header-profile-wrapper {
     display: flex;
     align-items: center;
-    gap: 0.8rem;
+    gap: 10px;
     cursor: pointer;
 }
 
 .header-username {
-    color: #ffffff;
-    font-weight: 500;
-    font-size: 1rem;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    transition: color 0.2s ease;
+}
+
+.header-profile-wrapper:hover .header-username {
+    color: #00ffd5;
 }
 
 .header-avatar {
-    width: 36px;
-    height: 36px;
-    background-color: #00b4a2;
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #12181f;
+    color: #fff;
     font-weight: 700;
-    font-size: 1rem;
-    box-shadow: 0 0 10px rgba(0, 180, 162, 0.3);
+    font-size: 13px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
 }
 
-.header-login-link {
-    color: #00b4a2;
-    text-decoration: none;
+
+/* ==========================================================================
+   🔔 NOTIFICATION BELL & DROPDOWN MENU STYLES
+   ========================================================================== */
+
+.header-bell-container {
+    position: relative;
+    display: inline-block;
+}
+
+.header-bell-wrapper {
+    cursor: pointer;
+    position: relative;
+    display: flex;
+    align-items: center;
+    padding: 6px;
+}
+
+.header-bell-icon {
+    color: #9ab3c8;
+    transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.header-bell-wrapper:hover .header-bell-icon {
+    color: #00ffd5;
+    transform: scale(1.05);
+}
+
+.header-bell-badge {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    background: #00ffd5;
+    color: #0d1117;
+    font-size: 10px;
+    font-weight: bold;
+    border-radius: 50%;
+    width: 15px;
+    height: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 8px #00ffd5;
+}
+
+.bell-dropdown {
+    position: absolute;
+    top: 45px;
+    right: -10px;
+    width: 320px;
+    background: rgba(18, 22, 30, 0.98);
+    border: 1px solid rgba(0, 255, 213, 0.15);
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+    z-index: 10000;
+    overflow: hidden;
+    animation: fadeInBell 0.2s ease-out;
+}
+
+@keyframes fadeInBell {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.bell-dropdown-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.01);
+}
+
+.bell-dropdown-header h4 {
+    margin: 0;
+    font-size: 14px;
+    color: #fff;
     font-weight: 600;
 }
 
-/* ჰედერის შუა ბლოკი */
-.header-middle {
+.bell-dropdown-list {
+    max-height: 280px;
+    overflow-y: auto;
+}
+
+/* Custom Scrollbar for Dropdown List */
+.bell-dropdown-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.bell-dropdown-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+.bell-item {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    flex: 1;
-    max-width: 450px;
-    margin: 0 2rem;
-}
-
-/* ძებნის ფორმის კონტეინერი */
-.header-search-form {
-    display: flex;
-    align-items: center;
-    width: 100%;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 20px; /* მთლიანად მომრგვალებული მინისებრი კონტეინერი */
-    padding: 2px 4px 2px 12px;
-    transition: border-color 0.2s, box-shadow 0.2s;
-}
-
-.header-search-form:focus-within {
-    border-color: rgba(0, 180, 162, 0.5);
-    box-shadow: 0 0 10px rgba(0, 180, 162, 0.15);
-}
-
-/* ინპუტის ველის გასუფთავება ძველი სტილებისგან */
-.glass-input-header {
-    background: transparent;
-    border: none;
-    color: #ffffff;
-    font-size: 0.9rem;
-    width: 100%;
-    height: 34px;
-    outline: none;
-}
-
-.glass-input-header::placeholder {
-    color: #5f758a;
-}
-
-
-.neon-button-header {
-    background: #00b4a2;
-    border: none;
-    color: #12181f;
-    padding: 0 1rem;
-    border-radius: 16px;
-    font-weight: 700;
-    font-size: 0.85rem;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.02);
     cursor: pointer;
-    height: 30px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background-color 0.2s, transform 0.1s;
+    transition: background 0.2s;
 }
 
-.neon-button-header:hover {
-    background: #00d1bc;
+.bell-item:hover {
+    background: rgba(0, 255, 213, 0.04);
 }
 
-.neon-button-header:active {
-    transform: scale(0.97);
+.bell-item-body p {
+    margin: 0;
+    font-size: 12px;
+    color: #c9d1d9;
+    line-height: 1.4;
+}
+
+.bell-neon-show {
+    color: #00ffd5;
+    font-weight: 500;
+}
+
+.bell-comment {
+    display: block;
+    font-size: 11px;
+    color: #8b949e;
+    font-style: italic;
+    margin-top: 2px;
+}
+
+.bell-empty {
+    padding: 20px;
+    text-align: center;
+    color: #8b949e;
+    font-size: 13px;
 }

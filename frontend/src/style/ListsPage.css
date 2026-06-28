@@ -72,6 +72,42 @@
     letter-spacing: 0.5px;
 }
 
+.lp-view-all-btn {
+    background: none;
+    border: none;
+    color: #5f758a;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    padding: 0;
+}
+
+.lp-view-all-btn:hover {
+    color: #00b4a2;
+}
+
+.lp-back-link {
+    display: inline-block;
+    color: #5f758a;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
+    margin: 28px 0 12px;
+}
+
+.lp-back-link:hover {
+    color: #00b4a2;
+}
+
+.lp-page-title {
+    color: #dce6ef;
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin: 0 0 28px;
+}
+
 /* ---------- grid layout ---------- */
 .lp-grid-3 {
     display: grid;
@@ -152,6 +188,16 @@
 }
 
 .lp-poster-strip-item-sm:first-child {
+    margin-left: 0;
+}
+
+.lp-poster-strip-item-card {
+    width: 80px;
+    aspect-ratio: 2 / 3;
+    margin-left: -30px;
+}
+
+.lp-poster-strip-item-card:first-child {
     margin-left: 0;
 }
 
@@ -245,6 +291,18 @@
 
 .lp-crew-pick-item {
     margin-bottom: 28px;
+}
+
+.lp-crew-pick-clickable {
+    cursor: pointer;
+    border-radius: 8px;
+    padding: 6px;
+    margin: -6px -6px 22px;
+    transition: background 0.15s ease;
+}
+
+.lp-crew-pick-clickable:hover {
+    background: rgba(255, 255, 255, 0.03);
 }
 
 .lp-crew-pick-item .lp-poster-strip {
@@ -343,57 +401,111 @@
     background: #00cfba;
 }
 
-.lp-my-lists-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 20px;
+.lp-poster-img {
+    object-fit: cover;
+    display: block;
+    background: #1c2530;
 }
 
-.lp-my-list-card {
+.lp-my-list-card-v2 {
+    cursor: pointer;
+    border-radius: 8px;
+    padding: 6px;
+    margin: -6px;
+    transition: background 0.15s ease;
+}
+
+.lp-my-list-card-v2:hover {
     background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 10px;
-    padding: 16px;
 }
 
-.lp-my-list-top {
-    display: flex;
-    align-items: flex-start;
-    gap: 14px;
-    cursor: pointer;
+.lp-my-list-card-active {
+    background: rgba(0, 180, 162, 0.07);
 }
 
-.lp-my-list-info {
-    flex: 1;
-    min-width: 0;
-}
-
-.lp-my-list-delete {
-    background: transparent;
-    border: 1px solid rgba(232, 93, 117, 0.4);
-    color: #e85d75;
-    font-size: 0.72rem;
-    font-weight: 700;
-    border-radius: 6px;
-    padding: 6px 10px;
-    cursor: pointer;
+.lp-my-list-card-v2 .lp-card-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
-    flex-shrink: 0;
 }
 
-.lp-my-list-delete:hover {
-    background: rgba(232, 93, 117, 0.12);
+.lp-my-list-delete-link {
+    background: transparent;
+    border: none;
+    color: #e85d75;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 0;
+    margin-left: auto;
 }
 
-.lp-my-list-detail {
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid rgba(255, 255, 255, 0.07);
+.lp-my-list-delete-link:hover {
+    text-decoration: underline;
+}
+
+/* ---------- management panel (shown as a modal over the page) ---------- */
+.lp-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(5, 8, 12, 0.72);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    z-index: 100;
+}
+
+.lp-manage-panel {
+    position: relative;
+    background: #161d27;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 24px;
+    width: 100%;
+    max-width: 520px;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.lp-modal-close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    background: rgba(255, 255, 255, 0.06);
+    border: none;
+    color: #9ab;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.lp-modal-close:hover {
+    background: rgba(255, 255, 255, 0.14);
+    color: #dce6ef;
+}
+
+.lp-manage-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    padding-right: 30px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.lp-manage-panel-header .lp-my-list-delete-link {
+    margin-left: auto;
 }
 
 .lp-my-list-items {
     list-style: none;
-    margin: 0 0 12px;
+    margin: 0 0 16px;
     padding: 0;
     display: flex;
     flex-direction: column;
@@ -405,10 +517,29 @@
     justify-content: space-between;
     align-items: center;
     color: #dce6ef;
-    font-size: 0.82rem;
+    font-size: 0.85rem;
     background: rgba(255, 255, 255, 0.03);
     border-radius: 6px;
     padding: 6px 10px;
+}
+
+.lp-my-list-item-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.lp-mini-poster {
+    width: 32px;
+    aspect-ratio: 2 / 3;
+    border-radius: 4px;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: #1c2530;
+}
+
+.lp-mini-poster-placeholder {
+    background: linear-gradient(160deg, rgba(0, 180, 162, 0.32), rgba(91, 141, 239, 0.22));
 }
 
 .lp-mini-remove {
@@ -424,9 +555,43 @@
     color: #e85d75;
 }
 
-.lp-add-show-form {
+.lp-add-show-search {
+    position: relative;
+}
+
+.lp-search-results {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 4px;
     display: flex;
-    gap: 8px;
+    flex-direction: column;
+    gap: 2px;
+    background: #1c2530;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.lp-search-result-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    color: #dce6ef;
+    font-size: 0.85rem;
+}
+
+.lp-search-result-row:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.lp-search-result-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
 }
 
 /* ---------- responsive ---------- */
@@ -436,10 +601,6 @@
     }
 
     .lp-two-col {
-        grid-template-columns: 1fr;
-    }
-
-    .lp-my-lists-grid {
         grid-template-columns: 1fr;
     }
 }

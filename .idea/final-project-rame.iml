@@ -134,5 +134,6 @@
         <SOURCES />
       </library>
     </orderEntry>
+    <orderEntry type="library" name="Maven: org.apache.tomcat.embed:tomcat-embed-core:11.0.22" level="project" />
   </component>
 </module>
