@@ -3,9 +3,11 @@ package com.serialtracker.backend.controller;
 import com.serialtracker.backend.entity.SeriesStatus;
 import com.serialtracker.backend.entity.UserShowStatus;
 import com.serialtracker.backend.entity.UserEpisodeStatus;
+import com.serialtracker.backend.entity.Recommendation;
 import com.serialtracker.backend.repository.UserEpisodeStatusRepository;
 import com.serialtracker.backend.repository.UserRepository;
 import com.serialtracker.backend.repository.UserShowStatusRepository;
+import com.serialtracker.backend.repository.RecommendationRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import jakarta.transaction.Transactional;
@@ -21,13 +23,16 @@ public class UserTrackingController {
     private final UserShowStatusRepository statusRepository;
     private final UserEpisodeStatusRepository episodeRepository;
     private final UserRepository userRepository;
+    private final RecommendationRepository recommendationRepository;
 
     public UserTrackingController(UserShowStatusRepository statusRepository,
                                   UserEpisodeStatusRepository episodeRepository,
-                                  UserRepository userRepository) {
+                                  UserRepository userRepository,
+                                  RecommendationRepository recommendationRepository) {
         this.statusRepository = statusRepository;
         this.episodeRepository = episodeRepository;
         this.userRepository = userRepository;
+        this.recommendationRepository = recommendationRepository;
     }
 
     @PostMapping("/show-status")
@@ -40,7 +45,6 @@ public class UserTrackingController {
                 .orElseThrow(() -> new RuntimeException("User not found"))
                 .getId();
 
-        // 🟢 ვეძებთ ძველს, თუ არ არის, ვქმნით სუფთად
         UserShowStatus showStatus = statusRepository.findByUserIdAndShowId(userId, showId)
                 .orElseGet(() -> {
                     UserShowStatus newStatusObj = new UserShowStatus();
@@ -158,5 +162,42 @@ public class UserTrackingController {
         statusRepository.save(showStatus);
 
         return ResponseEntity.ok(showStatus.isFavorite());
+    }
+
+    // ==========================================
+    // ✉️ RECOMMENDATIONS FUNCTIONALITY
+    // ==========================================
+
+    @PostMapping("/recommend")
+    public ResponseEntity<?> recommendShow(
+            @RequestParam String senderUsername,
+            @RequestParam String targetUsername,
+            @RequestParam int showId,
+            @RequestParam String showName,
+            @RequestParam(required = false) String comment) {
+
+        Recommendation rec = new Recommendation(senderUsername, targetUsername, showId, showName, comment);
+        recommendationRepository.save(rec);
+        return ResponseEntity.ok("Recommendation sent successfully!");
+    }
+
+    @GetMapping("/recommendations")
+    public ResponseEntity<?> getRecommendations(@RequestParam String username) {
+        List<Recommendation> recs = recommendationRepository.findByTargetUsernameOrderByCreatedAtDesc(username);
+        return ResponseEntity.ok(recs);
+    }
+
+    @PostMapping("/recommendations/read")
+    public ResponseEntity<?> markAsRead(@RequestParam String username) {
+        List<Recommendation> unread = recommendationRepository.findByTargetUsernameAndIsReadFalse(username);
+        unread.forEach(r -> r.setRead(true));
+        recommendationRepository.saveAll(unread);
+        return ResponseEntity.ok("Notifications marked as read");
+    }
+
+    @GetMapping("/recommendations/unread-count")
+    public ResponseEntity<?> getUnreadCount(@RequestParam String username) {
+        int count = recommendationRepository.findByTargetUsernameAndIsReadFalse(username).size();
+        return ResponseEntity.ok(count);
     }
 }

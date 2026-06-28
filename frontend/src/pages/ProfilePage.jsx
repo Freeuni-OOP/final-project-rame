@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import '../style/ProfilePage.css';
 
 const FRIENDS_BASE_URL = 'https://localhost:8443/api/friends';
@@ -63,6 +64,8 @@ const NETWORK_SUGGESTION_STATS = { eye: 1240, grid: 18, heart: 326 };
 
 const AVATAR_COLORS = ['#00b4a2', '#e85d75', '#f2b134', '#5b8def', '#9b59b6', '#2ecc71'];
 
+
+
 function colorForName(name) {
     if (!name) return AVATAR_COLORS[0];
     const code = name.charCodeAt(0) || 0;
@@ -106,6 +109,7 @@ function GridIcon() {
 }
 
 export default function ProfilePage() {
+    const navigate = useNavigate();
     const [friendsCount, setFriendsCount] = useState(0);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('profile');
@@ -115,6 +119,7 @@ export default function ProfilePage() {
     const [pending, setPending] = useState([]);
     const [sent, setSent] = useState([]);
     const [suggestions, setSuggestions] = useState([]);
+    const [recommendations, setRecommendations] = useState([]); // 👈 ეს ხაზი წინა ნაბიჯზე გამოგვრჩა და აუცილებელია!
     const [requestsTab, setRequestsTab] = useState('pending');
     const [addUsername, setAddUsername] = useState('');
     const [panelMessage, setPanelMessage] = useState('');
@@ -133,19 +138,26 @@ export default function ProfilePage() {
 
     const loadAll = () => {
         if (!username) return;
+        setLoading(true);
+
+        const authHeaders = { Authorization: `Bearer ${token}` };
+
         Promise.all([
             fetch(`${FRIENDS_BASE_URL}?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`${FRIENDS_BASE_URL}/pending?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`${FRIENDS_BASE_URL}/sent?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`${FRIENDS_BASE_URL}/suggestions?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+            fetch(`https://localhost:8443/api/tracking/recommendations?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : []))
         ])
-            .then(([friendsList, pendingList, sentList, suggestionsList]) => {
+            .then(([friendsList, pendingList, sentList, suggestionsList, recsList]) => {
                 setFriends(friendsList || []);
                 setFriendsCount((friendsList || []).length);
                 setPending(pendingList || []);
                 setSent(sentList || []);
                 setSuggestions(suggestionsList || []);
+                setRecommendations(recsList || []);
             })
+            .catch(err => console.error("Error loading profile data:", err))
             .finally(() => setLoading(false));
     };
 
@@ -275,7 +287,52 @@ export default function ProfilePage() {
                                     Don&apos;t forget to select your <strong>favorite films</strong>!
                                 </p>
                             </section>
-
+                            {/* ================= 👇 ჩაამატე ეს ახალი სექცია ზუსტად აქ 👇 ================= */}
+                            <section className="pp-block">
+                                <div className="pp-block-header">
+                                    <span className="pp-block-title">Recommended by Friends</span>
+                                </div>
+                                {recommendations.length === 0 ? (
+                                    <p className="pp-favorite-empty">No recommendations from friends yet.</p>
+                                ) : (
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px', marginTop: '12px' }}>
+                                        {recommendations.map(rec => (
+                                            <div
+                                                key={rec.id}
+                                                onClick={() => navigate(`/shows/${rec.showId}`)}
+                                                style={{
+                                                    background: 'rgba(255, 255, 255, 0.03)',
+                                                    border: '1px solid rgba(0, 255, 213, 0.1)',
+                                                    borderRadius: '8px',
+                                                    padding: '12px',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.2s ease-in-out'
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    e.currentTarget.style.borderColor = '#00ffd5';
+                                                    e.currentTarget.style.background = 'rgba(0, 255, 213, 0.03)';
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.currentTarget.style.borderColor = 'rgba(0, 255, 213, 0.1)';
+                                                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                                                }}
+                                            >
+                        <span style={{ fontSize: '11px', color: '#8b949e', display: 'block', marginBottom: '4px' }}>
+                            From: <strong style={{ color: '#fff' }}>{rec.senderUsername}</strong>
+                        </span>
+                                                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', color: '#00ffd5', fontWeight: '500' }}>
+                                                    {rec.showName}
+                                                </h4>
+                                                {rec.comment && (
+                                                    <p style={{ margin: '0', fontSize: '11px', color: '#c9d1d9', fontStyle: 'italic', borderLeft: '2px solid rgba(0, 255, 213, 0.4)', paddingLeft: '6px' }}>
+                                                        "{rec.comment}"
+                                                    </p>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </section>
                             <section className="pp-block">
                                 <div className="pp-block-header">
                                     <span className="pp-block-title">Recent Activity</span>

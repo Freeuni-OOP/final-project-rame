@@ -2,124 +2,113 @@ import React, { useState, useEffect } from 'react';
 import '../style/RecommendButton.css';
 
 export default function RecommendButton({ showId, showName }) {
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [friendSearch, setFriendSearch] = useState('');
-    const [friends, setFriends] = useState([]); // რეალური მეგობრების სია
-    const [loadingFriends, setLoadingFriends] = useState(false);
-    const [sentStatus, setSentStatus] = useState({}); // { friendUsername: true }
+    const [friends, setFriends] = useState([]);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [isOpen, setIsOpen] = useState(false);
+    const [sentStatus, setSentStatus] = useState({}); // ინახავს რომელი იუზერისთვისაა უკვე გაგზავნილი (მაგ: { nika99: true })
 
-    // 🔑 ტოკენიდან იუზერნეიმის ამოღება (ისევე როგორც ShowsDetailsPage-ში გაქვს)
     const tokenObj = localStorage.getItem('token');
     const token = tokenObj ? JSON.parse(tokenObj).token : null;
 
-    const parseJwt = (token) => {
-        if (!token) return null;
-        try { return JSON.parse(atob(token.split('.')[1])); }
-        catch (e) { return null; }
+    const parseJwt = (t) => {
+        if (!t) return null;
+        try { return JSON.parse(atob(t.split('.')[1])); } catch (e) { return null; }
     };
 
     const decodedToken = parseJwt(token);
-    const currentUsername = decodedToken?.sub; // მიმდინარე ავტორიზებული იუზერი
+    const currentUsername = decodedToken?.sub;
 
-    // 👥 წამოვიღოთ რეალური მეგობრების სია ბექენდიდან მოდალის გახსნისას
+    // მეგობრების წამოღება მოდალის გახსნისას
     useEffect(() => {
-        if (isModalOpen && currentUsername) {
-            setLoadingFriends(true);
-            fetch(`https://localhost:8443/api/friends?actingUsername=${currentUsername}`)
-                .then(res => {
-                    if (!res.ok) throw new Error("Failed to load friends");
-                    return res.json();
-                })
-                .then(data => {
-                    // რადგან ბექენდი აბრუნებს უბრალოდ იუზერნეიმების მასივს ["user1", "user2"], გადავაქციოთ ობიექტებად
-                    const formattedFriends = data.map((username, index) => ({
-                        id: index,
-                        name: username,
-                        avatar: "👤" // დროებითი ავატარი სტილისთვის
-                    }));
-                    setFriends(formattedFriends);
-                })
-                .catch(err => console.error("Error fetching friends:", err))
-                .finally(() => setLoadingFriends(false));
+        if (isOpen && currentUsername && token) {
+            fetch(`https://localhost:8443/api/friends?actingUsername=${currentUsername}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+                .then(res => res.ok ? res.json() : [])
+                .then(data => setFriends(data))
+                .catch(err => console.error("Error fetching friends:", err));
         }
-    }, [isModalOpen, currentUsername]);
+    }, [isOpen, currentUsername, token]);
 
-    // ✉️ რეკომენდაციის გაგზავნა ბექენდზე
-    const handleSend = (targetUsername) => {
-        if (!currentUsername) return;
+    // რეკომენდაციის გაგზავნა კონკრეტულ მეგობართან
+    const handleSendRecommend = (targetFriend) => {
+        if (sentStatus[targetFriend]) return; // თუ უკვე გაგზავნილია, არაფერი ქნას
 
-        fetch(`https://localhost:8443/api/shows/${showId}/recommend?senderUsername=${currentUsername}&targetUsername=${targetUsername}`, {
-            method: 'POST'
+        const commentPlaceholder = "Check out this awesome show!"; // მოდალს რადგან ტექსტარეა არ აქვს, სტანდარტული ტექსტი გავაყოლოთ
+        const url = `https://localhost:8443/api/tracking/recommend?senderUsername=${currentUsername}&targetUsername=${targetFriend}&showId=${showId}&showName=${encodeURIComponent(showName)}&comment=${encodeURIComponent(commentPlaceholder)}`;
+
+        fetch(url, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` }
         })
             .then(res => {
                 if (res.ok) {
-                    // თუ წარმატებით გაიგზავნა, ვიზუალურად შემწვანდეს ღილაკი
-                    setSentStatus(prev => ({ ...prev, [targetUsername]: true }));
+                    // მოვნიშნოთ ეს იუზერი როგორც "Sent"
+                    setSentStatus(prev => ({ ...prev, [targetFriend]: true }));
                 } else {
-                    alert("Could not send recommendation");
+                    alert("Failed to send recommendation.");
                 }
             })
-            .catch(err => console.error("Error sending recommendation:", err));
+            .catch(() => alert("Error connecting to server."));
     };
 
-    const filteredFriends = friends.filter(f =>
-        f.name.toLowerCase().includes(friendSearch.toLowerCase())
-    );
-
-    // თუ მომხმარებელი არ არის შესული საიტზე, ღილაკი საერთოდ არ გამოვაჩინოთ
     if (!currentUsername) return null;
+
+    // გავაფილტროთ მეგობრები ძებნის ველის მიხედვით
+    const filteredFriends = friends.filter(friend =>
+        friend.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
     return (
         <div className="recommend-wrapper">
-            <button className="recommend-main-btn" onClick={() => setIsModalOpen(true)}>
-                <span className="btn-icon">✉️</span> Recommend to...
+            {/* ✉️ პრემიუმ ნეონის ღილაკი სერიალის გვერდისთვის */}
+            <button className="recommend-main-btn" onClick={() => setIsOpen(true)}>
+                <span>✉️</span> Recommend to Friend
             </button>
 
-            {isModalOpen && (
-                <div className="rec-overlay" onClick={() => setIsModalOpen(false)}>
+            {/* ოვერლეი + მოდალური ბლოკი */}
+            {isOpen && (
+                <div className="rec-overlay" onClick={() => setIsOpen(false)}>
                     <div className="rec-modal" onClick={(e) => e.stopPropagation()}>
+
                         <div className="rec-header">
                             <h3>Recommend <span className="rec-neon-title">"{showName}"</span></h3>
-                            <button className="rec-close" onClick={() => setIsModalOpen(false)}>✕</button>
+                            <button className="rec-close" onClick={() => setIsOpen(false)}>✕</button>
                         </div>
 
+                        {/* ძებნის ინპუტი */}
                         <input
                             type="text"
-                            placeholder="Search friends..."
-                            value={friendSearch}
-                            onChange={(e) => setFriendSearch(e.target.value)}
                             className="rec-search"
+                            placeholder="Search friends..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
                         />
 
+                        {/* მეგობრების სია */}
                         <div className="rec-list">
-                            {loadingFriends ? (
-                                <div className="rec-empty">Loading friends...</div>
+                            {filteredFriends.length === 0 ? (
+                                <div className="rec-empty">No friends found</div>
                             ) : (
-                                <>
-                                    {filteredFriends.map(friend => {
-                                        const isSent = sentStatus[friend.name];
-                                        return (
-                                            <div key={friend.id} className="rec-row">
-                                                <div className="rec-user-info">
-                                                    <span className="rec-avatar">{friend.avatar}</span>
-                                                    <span className="rec-username">{friend.name}</span>
-                                                </div>
-                                                <button
-                                                    className={`rec-action-btn ${isSent ? 'sent' : ''}`}
-                                                    onClick={() => handleSend(friend.name)}
-                                                    disabled={isSent}
-                                                >
-                                                    {isSent ? "Sent ✓" : "Send"}
-                                                </button>
-                                            </div>
-                                        );
-                                    })}
-                                    {filteredFriends.length === 0 && (
-                                        <div className="rec-empty">No friends found.</div>
-                                    )}
-                                </>
+                                filteredFriends.map(friendName => (
+                                    <div key={friendName} className="rec-row">
+                                        <div className="rec-user-info">
+                                            <span className="rec-avatar">👤</span>
+                                            <span className="rec-username">{friendName}</span>
+                                        </div>
+
+                                        <button
+                                            className={`rec-action-btn ${sentStatus[friendName] ? 'sent' : ''}`}
+                                            onClick={() => handleSendRecommend(friendName)}
+                                            disabled={sentStatus[friendName]}
+                                        >
+                                            {sentStatus[friendName] ? '✓ Sent' : 'Send'}
+                                        </button>
+                                    </div>
+                                ))
                             )}
                         </div>
+
                     </div>
                 </div>
             )}
