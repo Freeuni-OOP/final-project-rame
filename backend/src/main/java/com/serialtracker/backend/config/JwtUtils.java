@@ -1,8 +1,9 @@
 package com.serialtracker.backend.config;
 
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
@@ -11,8 +12,17 @@ import java.util.Date;
 @Component
 public class JwtUtils {
 
-    private final SecretKey jwtSecret = Keys.secretKeyFor(SignatureAlgorithm.HS256);
+    // Inject the stable base64 secret from properties
+    @Value("${app.jwt.secret}")
+    private String jwtSecretString;
+
     private final int jwtExpirationMs = 86400000;
+
+    // Helper method to get the signing key consistently
+    private SecretKey getSigningKey() {
+        byte[] keyBytes = Decoders.BASE64.decode(jwtSecretString);
+        return Keys.hmacShaKeyFor(keyBytes);
+    }
 
     // ტოკენის გენერირება
     public String generateJwtToken(String username) {
@@ -20,14 +30,13 @@ public class JwtUtils {
                 .setSubject(username)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date((new Date()).getTime() + jwtExpirationMs))
-                .signWith(jwtSecret)
+                .signWith(getSigningKey()) // Use stable key
                 .compact();
     }
 
-
     public String getUsernameFromJwtToken(String token) {
         return Jwts.parser()
-                .verifyWith(jwtSecret)
+                .verifyWith(getSigningKey()) // Use stable key
                 .build()
                 .parseSignedClaims(token)
                 .getPayload()
@@ -37,7 +46,7 @@ public class JwtUtils {
     public boolean validateJwtToken(String authToken) {
         try {
             Jwts.parser()
-                    .verifyWith(jwtSecret)
+                    .verifyWith(getSigningKey()) // Use stable key
                     .build()
                     .parseSignedClaims(authToken);
             return true;
