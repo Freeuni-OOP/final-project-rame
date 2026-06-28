@@ -114,6 +114,7 @@ export default function ProfilePage() {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('profile');
     const [likesSubTab, setLikesSubTab] = useState('Films');
+    const [activities, setActivities] = useState([]);
 
     const [friends, setFriends] = useState([]);
     const [pending, setPending] = useState([]);
@@ -147,15 +148,17 @@ export default function ProfilePage() {
             fetch(`${FRIENDS_BASE_URL}/pending?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`${FRIENDS_BASE_URL}/sent?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`${FRIENDS_BASE_URL}/suggestions?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-            fetch(`https://localhost:8443/api/tracking/recommendations?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : []))
+            fetch(`https://localhost:8443/api/tracking/recommendations?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+            fetch(`https://localhost:8443/api/tracking/activity?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : []))
         ])
-            .then(([friendsList, pendingList, sentList, suggestionsList, recsList]) => {
+            .then(([friendsList, pendingList, sentList, suggestionsList, recsList, activityList]) => {
                 setFriends(friendsList || []);
                 setFriendsCount((friendsList || []).length);
                 setPending(pendingList || []);
                 setSent(sentList || []);
                 setSuggestions(suggestionsList || []);
                 setRecommendations(recsList || []);
+                setActivities((activityList || []).sort((a, b) => b.id - a.id));
             })
             .catch(err => console.error("Error loading profile data:", err))
             .finally(() => setLoading(false));
@@ -358,22 +361,138 @@ export default function ProfilePage() {
                             <section className="pp-block">
                                 <div className="pp-block-header">
                                     <span className="pp-block-title">Recent Activity</span>
-                                    <span className="pp-block-all">All</span>
+                                    <span className="pp-block-all" onClick={() => setActiveTab('diary')} style={{ cursor: 'pointer' }}>All</span>
                                 </div>
                                 <div className="pp-activity-grid">
-                                    {RECENT_ACTIVITY_GRID.map((item, i) => (
-                                        <div key={i} className="pp-activity-poster">
-                                            <div className="pp-poster-placeholder-lg" />
-                                            {item.type === 'like' && (
-                                                <span className="pp-poster-indicator pp-poster-like"><HeartIcon /></span>
-                                            )}
-                                            {item.type === 'rating' && (
-                                                <span className="pp-poster-indicator pp-poster-stars">
-                                                    {'★'.repeat(item.stars)}
-                                                </span>
-                                            )}
-                                        </div>
-                                    ))}
+                                    {(() => {
+                                        if (!activities || activities.length === 0) {
+                                            return <p className="pp-favorite-empty" style={{ gridColumn: '1/-1' }}>No recent activity.</p>;
+                                        }
+
+                                        const mergedMap = new Map();
+
+                                        activities.forEach((act) => {
+                                            const id = act.showId;
+                                            const detailText = act.detail || "";
+                                            const currentAction = act.actionType || "";
+
+                                            if (!mergedMap.has(id)) {
+                                                const isStatusAction = ['WATCHING', 'COMPLETED', 'DROPPED', 'PLAN_TO_WATCH'].includes(currentAction);
+
+                                                mergedMap.set(id, {
+                                                    id: act.id,
+                                                    showId: id,
+                                                    showName: act.showName,
+                                                    posterPath: act.posterPath,
+                                                    rating: act.rating || (detailText.includes("Rated") ? parseInt(detailText.match(/Rated (\d)/)?.[1] || 0, 10) : 0),
+                                                    isLiked: currentAction === 'LIKED' || detailText.toLowerCase().includes('favorite') || detailText.includes('❤️'),
+                                                    status: isStatusAction ? currentAction : ""
+                                                });
+                                            }
+
+                                            const currentObj = mergedMap.get(id);
+
+                                            if (!currentObj.posterPath && act.posterPath) {
+                                                currentObj.posterPath = act.posterPath;
+                                            }
+
+                                            if (currentAction === 'LIKED' || detailText.toLowerCase().includes('favorite') || detailText.includes('❤️')) {
+                                                currentObj.isLiked = true;
+                                            }
+
+                                            if (act.rating && !currentObj.rating) {
+                                                currentObj.rating = act.rating;
+                                            } else if (detailText.includes("Rated") && !currentObj.rating) {
+                                                currentObj.rating = parseInt(detailText.match(/Rated (\d)/)?.[1] || 0, 10);
+                                            }
+
+                                            let incomingStatus = "";
+                                            if (currentAction === 'COMPLETED' || detailText.includes('COMPLETED') || detailText.includes('Completed')) {
+                                                incomingStatus = "COMPLETED";
+                                            } else if (currentAction === 'WATCHING' || detailText.includes('WATCHING') || detailText.includes('Watching')) {
+                                                incomingStatus = "WATCHING";
+                                            } else if (currentAction === 'DROPPED' || detailText.includes('DROPPED') || detailText.includes('Dropped')) {
+                                                incomingStatus = "DROPPED";
+                                            } else if (currentAction === 'PLAN_TO_WATCH' || detailText.includes('PLAN_TO_WATCH') || detailText.includes('Plan')) {
+                                                incomingStatus = "PLAN_TO_WATCH";
+                                            }
+
+                                            if (incomingStatus) {
+                                                if (!currentObj.status) {
+                                                    currentObj.status = incomingStatus;
+                                                }
+                                            }
+                                        });
+
+                                        const uniqueActivities = Array.from(mergedMap.values()).slice(0, 4);
+
+                                        return uniqueActivities.map((act) => {
+                                            const posterUrl = act.posterPath
+                                                ? `https://image.tmdb.org/t/p/w300${act.posterPath}`
+                                                : null;
+
+                                            // 🟢 აი ეს ბლოკი აღდგა, რის გამოც აღარ გაქრაშავს!
+                                            let statusLabel = "";
+                                            let statusClass = "";
+
+                                            if (act.status === 'COMPLETED') {
+                                                statusLabel = "✔ Watched";
+                                                statusClass = "status-completed";
+                                            } else if (act.status === 'WATCHING') {
+                                                statusLabel = "👁 Watching";
+                                                statusClass = "status-watching";
+                                            } else if (act.status === 'DROPPED') {
+                                                statusLabel = "✕ Dropped";
+                                                statusClass = "status-dropped";
+                                            } else if (act.status === 'PLAN_TO_WATCH') {
+                                                statusLabel = "⏳ Plan";
+                                                statusClass = "status-plan";
+                                            }
+
+                                            return (
+                                                <div key={act.id} className="pp-activity-poster" onClick={() => navigate(`/shows/${act.showId}`)}>
+
+                                                    {/* პოსტერის კონტეინერი */}
+                                                    <div className="pp-poster-placeholder-lg">
+                                                        {posterUrl ? (
+                                                            <img src={posterUrl} alt={act.showName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                        ) : (
+                                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px', textAlign: 'center', fontSize: '11px', color: '#9aabbc', fontWeight: 'bold', height: '100%' }}>
+                                                                {act.showName}
+                                                            </div>
+                                                        )}
+
+                                                        {/* სათაური მხოლოდ Hover-ზე */}
+                                                        <div className="pp-poster-title-hover">
+                                                            {act.showName}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* ინდიკატორები და ბეიჯები ფუტერში */}
+                                                    <div className="pp-poster-footer-info">
+                                                        {act.isLiked && (
+                                                            <span className="pp-poster-like">❤️</span>
+                                                        )}
+
+                                                        {act.rating > 0 && (
+                                                            <span className="pp-poster-stars">
+                                {'★'.repeat(Math.round(act.rating))}
+                            </span>
+                                                        )}
+
+                                                        {statusLabel && (
+                                                            <div className="pp-poster-indicator">
+                                <span className={`pp-status-badge ${statusClass}`}>
+                                    {statusLabel}
+                                    </span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                </div>
+                                            );
+                                        });
+                                    })()}
                                 </div>
                             </section>
                         </div>
@@ -384,13 +503,24 @@ export default function ProfilePage() {
                                     <span className="pp-block-title">Activity</span>
                                 </div>
                                 <div className="pp-activity-feed">
-                                    {ACTIVITY_FEED_PLACEHOLDER.map((a, i) => (
-                                        <div key={i} className="pp-activity-row">
-                                            <span className="pp-activity-dot" />
-                                            <span className="pp-activity-text">{a.text}</span>
-                                            <span className="pp-activity-time">{a.time}</span>
-                                        </div>
-                                    ))}
+                                    {activities.length === 0 ? (
+                                        <p className="pp-favorite-empty">No logged interactions yet.</p>
+                                    ) : (
+                                        activities.slice(0,15).map((act) => {
+                                            const dateObj = new Date(act.createdAt);
+                                            const timeLabel = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+                                            return (
+                                                <div key={act.id} className="pp-activity-row" onClick={() => navigate(`/shows/${act.showId}`)} style={{ cursor: 'pointer' }}>
+                                                    <span className="pp-activity-dot" style={{ backgroundColor: act.actionType === 'LIKED' ? '#ff3a44' : '#00ffd5' }} />
+                                                    <span className="pp-activity-text">
+                                    You <strong>{act.actionType.toLowerCase().replace('_', ' ')}</strong> <span style={{ color: '#00ffd5' }}>{act.showName}</span> ({act.detail})
+                                </span>
+                                                    <span className="pp-activity-time">{timeLabel}</span>
+                                                </div>
+                                            );
+                                        })
+                                    )}
                                 </div>
                             </section>
                         </div>
