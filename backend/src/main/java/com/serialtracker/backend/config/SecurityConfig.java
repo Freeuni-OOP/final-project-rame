@@ -45,6 +45,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/tracking/**").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/friends/**").permitAll()
+                        .requestMatchers("/api/lists/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 // 🟢 ⚡ აი ეს მიუთითებს, რომ მოთხოვნისას ჯერ ჩვენი JWT ფილტრი გაეშვას!
