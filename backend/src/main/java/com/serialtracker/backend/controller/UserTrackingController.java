@@ -139,6 +139,20 @@ public class UserTrackingController {
         return ResponseEntity.ok(statusRepository.findByUserIdAndShowId(userId, showId).orElse(null));
     }
 
+    @GetMapping("/watchlist")
+    public ResponseEntity<?> getWatchlist(@RequestParam String username) {
+        Long userId = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"))
+                .getId();
+
+        List<Integer> showIds = statusRepository.findByUserIdAndStatusOrderByIdDesc(userId, SeriesStatus.PLAN_TO_WATCH)
+                .stream()
+                .map(UserShowStatus::getShowId)
+                .toList();
+
+        return ResponseEntity.ok(showIds);
+    }
+
     @PostMapping("/toggle-favorite")
     public ResponseEntity<?> toggleFavorite(
             @RequestParam String username,
