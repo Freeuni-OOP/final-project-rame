@@ -73,6 +73,13 @@ export default function ShowsPage() {
     }, [allShows, trendingShowsList, username]);
 
     const fetchShowStatusFromBackend = (showId) => {
+        // 🟢 2. დაზღვევა: თუ ტოკენი არ არის, რექვესტი საერთოდ არ გაუშვა, რომ 403 არ აგდოს კოსოლში
+        if (!token || !username) {
+            // თუ ტოკენი არ არსებობს, შეგიძლია უბრალოდ გაჩერდე
+            console.warn("No token found, skipping status fetch.");
+            return;
+        }
+
         fetch(`${TRACKING_URL}/get-status?username=${username}&showId=${showId}`, {
             headers: { 'Authorization': `Bearer ${token}` }
         })
@@ -141,12 +148,18 @@ export default function ShowsPage() {
         }
     };
 
-    const handleStatusUpdate = (showId, statusName) => {
+    const handleStatusUpdate = (show, statusName) => {
+        const showId = show.id;
+        const showName = show.name || show.title || "Unknown Show";
+        // 🟢 ამოვიღოთ პოსტერის გზა უსაფრთხოდ
+        const posterPath = show.poster_path || "";
+
         const currentStatus = activeStatus[showId];
         const newStatus = currentStatus === statusName ? null : statusName;
         setActiveStatus(prev => ({ ...prev, [showId]: newStatus }));
 
-        fetch(`${TRACKING_URL}/show-status?username=${username}&showId=${showId}&status=${newStatus !== null ? newStatus : ''}`, {
+        // 🟢 URL-ის ბოლოში დავამატეთ: &posterPath=${encodeURIComponent(posterPath)}
+        fetch(`${TRACKING_URL}/show-status?username=${username}&showId=${showId}&status=${newStatus !== null ? newStatus : ''}&showName=${encodeURIComponent(showName)}&posterPath=${encodeURIComponent(posterPath)}`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`
@@ -178,11 +191,15 @@ export default function ShowsPage() {
             });
     };
 
-    const handleFavoriteToggle = (showId) => {
+    const handleFavoriteToggle = (show) => {
+        const showId = show.id;
+        const showName = show.name || show.title || "Unknown Show";
+        const posterPath = show.poster_path || ""; // 🟢 წამოვიღოთ პოსტერი
         const currentFav = !!favorites[showId];
         setFavorites(prev => ({ ...prev, [showId]: !currentFav }));
 
-        fetch(`${TRACKING_URL}/toggle-favorite?username=${username}&showId=${showId}`, {
+        // 🟢 URL-ის ბოლოში მივაწერეთ &posterPath=...
+        fetch(`${TRACKING_URL}/toggle-favorite?username=${username}&showId=${showId}&showName=${encodeURIComponent(showName)}&posterPath=${encodeURIComponent(posterPath)}`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` }
         }).catch(err => console.error(err));
@@ -247,9 +264,10 @@ export default function ShowsPage() {
                                 className={eyeClass}
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    if (!currentShowStatus) handleStatusUpdate(id, 'WATCHING');
-                                    else if (currentShowStatus === 'WATCHING') handleStatusUpdate(id, 'COMPLETED');
-                                    else handleStatusUpdate(id, null);
+                                    // 🟢 id-ს ნაცვლად გადავეცით მთლიანი show ობიექტი
+                                    if (!currentShowStatus) handleStatusUpdate(show, 'WATCHING');
+                                    else if (currentShowStatus === 'WATCHING') handleStatusUpdate(show, 'COMPLETED');
+                                    else handleStatusUpdate(show, null);
                                 }}
                                 title="Mark as Watched / Watching"
                             >
@@ -258,7 +276,10 @@ export default function ShowsPage() {
 
                             <button
                                 className={`action-icon heart-icon ${isFavoriteShow ? 'active' : ''}`}
-                                onClick={(e) => { e.stopPropagation(); handleFavoriteToggle(id); }}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleFavoriteToggle(show); // 🟢 id-ს ნაცვლად გადავეცით მთლიანი show
+                                }}
                                 title="Favorite"
                             >
                                 {isFavoriteShow ? '❤️' : '♡'}
@@ -266,7 +287,10 @@ export default function ShowsPage() {
 
                             <button
                                 className={`action-icon star-icon ${currentShowStatus === 'PLAN_TO_WATCH' ? 'active' : ''}`}
-                                onClick={(e) => { e.stopPropagation(); handleStatusUpdate(id, 'PLAN_TO_WATCH'); }}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleStatusUpdate(show, 'PLAN_TO_WATCH'); // 🟢 id-ს ნაცვლად გადავეცით მთლიანი show
+                                }}
                                 title="Plan to Watch"
                             >
                                 ★
@@ -274,7 +298,10 @@ export default function ShowsPage() {
 
                             <button
                                 className={`action-icon drop-icon ${currentShowStatus === 'DROPPED' ? 'active' : ''}`}
-                                onClick={(e) => { e.stopPropagation(); handleStatusUpdate(id, 'DROPPED'); }}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleStatusUpdate(show, 'DROPPED'); // 🟢 id-ს ნაცვლად გადავეცით მთლიანი show
+                                }}
                                 title="Dropped"
                             >
                                 ✕

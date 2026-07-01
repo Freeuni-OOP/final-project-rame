@@ -4,10 +4,8 @@ import com.serialtracker.backend.entity.SeriesStatus;
 import com.serialtracker.backend.entity.UserShowStatus;
 import com.serialtracker.backend.entity.UserEpisodeStatus;
 import com.serialtracker.backend.entity.Recommendation;
-import com.serialtracker.backend.repository.UserEpisodeStatusRepository;
-import com.serialtracker.backend.repository.UserRepository;
-import com.serialtracker.backend.repository.UserShowStatusRepository;
-import com.serialtracker.backend.repository.RecommendationRepository;
+import com.serialtracker.backend.entity.Activity;
+import com.serialtracker.backend.repository.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import jakarta.transaction.Transactional;
@@ -24,22 +22,28 @@ public class UserTrackingController {
     private final UserEpisodeStatusRepository episodeRepository;
     private final UserRepository userRepository;
     private final RecommendationRepository recommendationRepository;
+    private final ActivityRepository activityRepository;
 
     public UserTrackingController(UserShowStatusRepository statusRepository,
                                   UserEpisodeStatusRepository episodeRepository,
                                   UserRepository userRepository,
-                                  RecommendationRepository recommendationRepository) {
+                                  RecommendationRepository recommendationRepository,
+                                  ActivityRepository activityRepository) { // 🟢 ჩამატებულია
         this.statusRepository = statusRepository;
         this.episodeRepository = episodeRepository;
         this.userRepository = userRepository;
         this.recommendationRepository = recommendationRepository;
+        this.activityRepository = activityRepository; // 🟢 ჩამატებულია
     }
 
     @PostMapping("/show-status")
     public ResponseEntity<?> updateShowStatus(
             @RequestParam String username,
             @RequestParam int showId,
-            @RequestParam(required = false) String status) {
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String showName,
+            @RequestParam(required = false) String posterPath,
+            @RequestParam(required = false) Double rating) {
 
         Long userId = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"))
@@ -62,6 +66,42 @@ public class UserTrackingController {
             SeriesStatus seriesStatus = SeriesStatus.valueOf(status.toUpperCase());
             showStatus.setStatus(seriesStatus);
             statusRepository.save(showStatus);
+
+            String finalShowName = "Show #" + showId;
+            if (showName != null && !showName.trim().isEmpty() && !showName.equals("null") && !showName.equals("undefined")) {
+                finalShowName = showName;
+            }
+
+            // 🟢 ყოველთვის ვქმნით ახალ აქტივობას სუფთად, რათა სხვადასხვა ქმედება ერთმანეთს არ დაეტაკოს
+            List<Activity> existingActivities = activityRepository.findByUsernameOrderByCreatedAtDesc(username);
+            Activity actToSave = new Activity();
+            actToSave.setUsername(username);
+            actToSave.setShowId(showId);
+            actToSave.setShowName(finalShowName);
+
+            // 🟢 ვსვამთ ActionType-ს, რომ ფრონტზე ადვილად წავიკითხოთ სტატუსი
+            actToSave.setActionType(seriesStatus.toString()); // WATCHING, COMPLETED, DROPPED, PLAN_TO_WATCH
+            actToSave.setDetail("Changed status to " + seriesStatus.toString().replace('_', ' '));
+            actToSave.setCreatedAt(java.time.LocalDateTime.now());
+
+            // 🟢 პოსტერის დაზღვევა
+            if (posterPath != null && !posterPath.trim().isEmpty() && !posterPath.equals("null")) {
+                actToSave.setPosterPath(posterPath);
+            } else {
+                // თუ ფრონტიდან არ მოვიდა, ვეძებთ იუზერის ძველ ჩანაწერებში ამ showId-ზე ფოტოს აღსადგენად
+                String foundPoster = existingActivities.stream()
+                        .filter(a -> a.getShowId() == showId && a.getPosterPath() != null)
+                        .map(Activity::getPosterPath)
+                        .findFirst()
+                        .orElse(null);
+                if (foundPoster != null) actToSave.setPosterPath(foundPoster);
+            }
+
+            if (rating != null) {
+                actToSave.setRating(rating);
+            }
+
+            activityRepository.save(actToSave);
             return ResponseEntity.ok("Show status updated to: " + seriesStatus);
         }
     }
@@ -156,7 +196,9 @@ public class UserTrackingController {
     @PostMapping("/toggle-favorite")
     public ResponseEntity<?> toggleFavorite(
             @RequestParam String username,
-            @RequestParam int showId) {
+            @RequestParam int showId,
+            @RequestParam(required = false) String showName,
+            @RequestParam(required = false) String posterPath) { // 🟢 ჩამატებულია posterPath
 
         Long userId = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"))
@@ -174,6 +216,45 @@ public class UserTrackingController {
 
         showStatus.setFavorite(!showStatus.isFavorite());
         statusRepository.save(showStatus);
+
+        if (showStatus.isFavorite()) {
+            String finalShowName = (showName != null && !showName.isEmpty()) ? showName : "Show #" + showId;
+
+            // 🔍 უსაფრთხო ძებნა: ვნახულობთ, ბოლო აქტივობა ხომ არ არის ამავე სერიალზე
+            List<Activity> existingActivities = activityRepository.findByUsernameOrderByCreatedAtDesc(username);
+            Activity actToSave = null;
+
+            if (!existingActivities.isEmpty() && existingActivities.get(0).getShowId() == showId) {
+                // თუ ბოლო ჩანაწერი ამავე სერიალზეა, ახალს კი არ ვქმნით, იმავეს ვაახლებთ!
+                actToSave = existingActivities.get(0);
+            } else {
+                // თუ სხვა სერიალია ან ფიდი ცარიელია, ვქმნით ახალს
+                actToSave = new Activity();
+                actToSave.setUsername(username);
+                actToSave.setShowId(showId);
+                actToSave.setShowName(finalShowName);
+            }
+
+            // ✍️ მონაცემების დასმა
+            actToSave.setActionType("LIKED");
+            actToSave.setDetail("Added to favorites ❤️");
+            actToSave.setCreatedAt(java.time.LocalDateTime.now()); // დროს ვწევთ წინ
+
+            // 🟢 პოსტერის აღდგენა/დაზღვევა
+            if (posterPath != null && !posterPath.trim().isEmpty() && !posterPath.equals("null")) {
+                actToSave.setPosterPath(posterPath);
+            } else if (actToSave.getPosterPath() == null) {
+                // თუ ფრონტიდან არ მოვიდა, ვეძებთ ისტორიაში ამავე სერიალის ძველ ფოტოს
+                String foundPoster = existingActivities.stream()
+                        .filter(a -> a.getShowId() == showId && a.getPosterPath() != null)
+                        .map(Activity::getPosterPath)
+                        .findFirst()
+                        .orElse(null);
+                if (foundPoster != null) actToSave.setPosterPath(foundPoster);
+            }
+
+            activityRepository.save(actToSave);
+        }
 
         return ResponseEntity.ok(showStatus.isFavorite());
     }
@@ -211,7 +292,7 @@ public class UserTrackingController {
         Recommendation rec = recommendationRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Recommendation not found"));
 
-        rec.setRead(true); // ან rec.setIsRead(true); გააჩნია როგორ გიწერია ენთითიში
+        rec.setRead(true);
         recommendationRepository.save(rec);
         return ResponseEntity.ok("Notification marked as read");
     }
@@ -226,5 +307,16 @@ public class UserTrackingController {
     public ResponseEntity<?> getUnreadCount(@RequestParam String username) {
         int count = recommendationRepository.findByTargetUsernameAndIsReadFalse(username).size();
         return ResponseEntity.ok(count);
+    }
+
+    // ==========================================
+    // 🕒 USER ACTIVITY FEED
+    // ==========================================
+
+    @GetMapping("/activity")
+    public ResponseEntity<?> getUserActivity(@RequestParam String username) {
+        // 🟢 ფრონტენდისთვის ბაზიდან წამოვიღებთ უახლეს აქტივობებს
+        List<Activity> activities = activityRepository.findByUsernameOrderByCreatedAtDesc(username);
+        return ResponseEntity.ok(activities);
     }
 }

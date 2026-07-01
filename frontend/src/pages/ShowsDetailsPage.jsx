@@ -89,8 +89,9 @@ function ShowsDetailsPage() {
         const newStatus = activeStatus === statusName ? null : statusName;
         setActiveStatus(newStatus);
 
-        fetch(`https://localhost:8443/api/tracking/show-status?username=${username}&showId=${id}&status=${newStatus !== null ? newStatus : ''}`, {
-            method: 'POST',
+        const currentShowName = showData?.name ? showData.name : `Show #${id}`;
+
+        fetch(`https://localhost:8443/api/tracking/show-status?username=${username}&showId=${id}&status=${newStatus !== null ? newStatus : ''}&showName=${encodeURIComponent(currentShowName)}&posterPath=${encodeURIComponent(showData?.poster_path || '')}`, {            method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`
             }
@@ -143,7 +144,7 @@ function ShowsDetailsPage() {
         if (!username) return;
         setIsFavorite(!isFavorite);
 
-        fetch(`https://localhost:8443/api/tracking/toggle-favorite?username=${username}&showId=${id}`, {
+        fetch(`https://localhost:8443/api/tracking/toggle-favorite?username=${username}&showId=${id}&showName=${encodeURIComponent(showData.name)}`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` }
         })
@@ -161,10 +162,10 @@ function ShowsDetailsPage() {
             }).catch(err => console.error(err));
         }
 
-        fetch(`https://localhost:8443/api/tracking/toggle-episode?username=${username}&showId=${id}&seasonNumber=${seasonNum}&episodeNumber=${episodeNum}`, {
+        fetch(`https://localhost:8443/api/tracking/show-status?username=${username}&showId=${id}&status=WATCHING&showName=${encodeURIComponent(showData.name)}`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` }
-        })
+        }).catch(err => console.error(err))
             .then(() => {
                 const isAlreadyWatched = watchedEpisodes.some(ep => ep.seasonNumber === seasonNum && ep.episodeNumber === episodeNum);
                 if (isAlreadyWatched) {

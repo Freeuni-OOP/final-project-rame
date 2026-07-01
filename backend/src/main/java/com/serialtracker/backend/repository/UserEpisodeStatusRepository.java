@@ -1,10 +1,11 @@
 package com.serialtracker.backend.repository;
 
 import com.serialtracker.backend.entity.UserEpisodeStatus;
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaRepository;import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 
+@Repository
 public interface UserEpisodeStatusRepository extends JpaRepository<UserEpisodeStatus, Long> {
     Optional<UserEpisodeStatus> findByUserIdAndShowIdAndSeasonNumberAndEpisodeNumber(
             Long userId, int showId, int seasonNumber, int episodeNumber);
