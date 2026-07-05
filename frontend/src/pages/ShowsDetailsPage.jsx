@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import '../style/ShowsDetailsPage.css';
 import RecommendButton from '../components/RecommendButton';
 import AddToListButton from '../components/AddToListButton';
+import LogModal from '../components/LogModal';
 
 function ShowsDetailsPage() {
     const { id } = useParams();
@@ -13,6 +14,8 @@ function ShowsDetailsPage() {
     const [selectedSeason, setSelectedSeason] = useState(1);
     const [seasonEpisodes, setSeasonEpisodes] = useState([]);
     const [reviews, setReviews] = useState([]);
+    const [showLogModal, setShowLogModal] = useState(false);
+    const [reviewsRefreshKey, setReviewsRefreshKey] = useState(0);
 
     const carouselRef = useRef(null);
 
@@ -68,7 +71,7 @@ function ShowsDetailsPage() {
                 console.error("Error fetching reviews:", err);
                 setReviews([]);
             });
-    }, [id, username, watchedEpisodes]);
+    }, [id, username, watchedEpisodes, reviewsRefreshKey]);
 
     useEffect(() => {
         fetch(`https://localhost:8443/api/shows/${id}/season/${selectedSeason}`)
@@ -324,7 +327,7 @@ function ShowsDetailsPage() {
                                 </button>
                             </div>
 
-                            <button className="design-btn log-btn">{'\u2795'} LOG</button>
+                            <button className="design-btn log-btn" onClick={() => setShowLogModal(true)}>{'\u2795'} LOG</button>
                             <AddToListButton showId={showData.id} showName={showData.name} />
 
                             <RecommendButton showId={showData.id} showName={showData.name} />
@@ -413,6 +416,14 @@ function ShowsDetailsPage() {
                     </div>
                 </main>
             </div>
+
+            {showLogModal && (
+                <LogModal
+                    initialShow={showData}
+                    onClose={() => setShowLogModal(false)}
+                    onSaved={() => setReviewsRefreshKey(k => k + 1)}
+                />
+            )}
         </div>
     );
 }

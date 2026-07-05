@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, ArrowLeft, Heart, Star } from 'lucide-react';
 import '../style/LogModal.css';
 
-export default function LogModal({ onClose }) {
+export default function LogModal({ onClose, initialShow = null, onSaved }) {
     const [step, setStep] = useState(1);
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
@@ -94,6 +94,14 @@ export default function LogModal({ onClose }) {
         }
     };
 
+    // თუ modal კონკრეტული სერიალიდან გაიხსნა (show details გვერდი) — search გამოვტოვოთ
+    useEffect(() => {
+        if (initialShow && initialShow.id) {
+            handleSelectShow(initialShow);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     const handleSeasonChange = (e) => {
         const value = e.target.value;
         setSelectedSeason(value);
@@ -164,6 +172,7 @@ export default function LogModal({ onClose }) {
             .then((res) => {
                 console.log("Save response status:", res.status);
                 if (!res.ok) throw new Error('Save failed: ' + res.status);
+                if (onSaved) onSaved();
                 onClose();
             })
             .catch((err) => {
