@@ -149,11 +149,10 @@ export default function ProfilePage() {
 
         const authHeaders = { Authorization: `Bearer ${token}` };
 
-        Promise.all([
-            // შეცვლილია Fetch -> fetch და R.json() -> r.json()
+        const publicCalls = Promise.all([
             fetch(`${FRIENDS_BASE_URL}?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`https://localhost:8443/api/tracking/watchlist?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-        ];
+        ]);
 
         // პირადი მონაცემი (მხოლოდ საკუთარ პროფილზე): requests, suggestions, recommendations
         const privateCalls = isOwnProfile ? [
