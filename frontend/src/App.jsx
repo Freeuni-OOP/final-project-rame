@@ -27,6 +27,7 @@ function App() {
                 <Route path="/lists/:id/edit" element={<ListEditPage />} />
                 <Route path="/lists/:id" element={<ListDetailPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/profile/:username" element={<ProfilePage />} />
             </Routes>
         </Router>
     );

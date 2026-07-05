@@ -139,5 +139,9 @@
     <orderEntry type="library" name="Maven: org.springframework.data:spring-data-commons:4.0.6" level="project" />
     <orderEntry type="library" name="Maven: org.apache.tomcat.embed:tomcat-embed-core:11.0.22" level="project" />
     <orderEntry type="library" name="Maven: com.fasterxml.jackson.core:jackson-annotations:2.21" level="project" />
+    <orderEntry type="library" name="Maven: org.springframework.boot:spring-boot-autoconfigure:4.0.7" level="project" />
+    <orderEntry type="library" name="Maven: org.springframework.boot:spring-boot:4.0.7" level="project" />
+    <orderEntry type="library" name="Maven: org.apache.tomcat.embed:tomcat-embed-core:11.0.22" level="project" />
+    <orderEntry type="library" name="Maven: org.springframework.security:spring-security-core:7.0.6" level="project" />
   </component>
 </module>
