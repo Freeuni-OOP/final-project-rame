@@ -4,6 +4,7 @@ import com.serialtracker.backend.entity.SeriesStatus;
 import com.serialtracker.backend.entity.UserShowStatus;
 import com.serialtracker.backend.entity.UserEpisodeStatus;
 import com.serialtracker.backend.entity.Recommendation;
+import com.serialtracker.backend.dto.DiaryEntryResponse;
 import com.serialtracker.backend.repository.UserEpisodeStatusRepository;
 import com.serialtracker.backend.repository.UserRepository;
 import com.serialtracker.backend.repository.UserShowStatusRepository;
@@ -12,6 +13,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import jakarta.transaction.Transactional;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 @RestController
@@ -151,6 +154,48 @@ public class UserTrackingController {
                 .toList();
 
         return ResponseEntity.ok(showIds);
+    }
+
+    // Diary: ამ იუზერის ყველა დათარიღებული ჩანაწერი (ეპიზოდები + whole-show),
+    // watchDate-ით ახლიდან-ძველისკენ დალაგებული. title/poster front-end-ი TMDB-დან იღებს.
+    @GetMapping("/diary")
+    public ResponseEntity<?> getDiary(@RequestParam String username) {
+        Long userId = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"))
+                .getId();
+
+        List<DiaryEntryResponse> entries = new ArrayList<>();
+
+        for (UserEpisodeStatus ep : episodeRepository.findByUserIdAndWatchDateIsNotNull(userId)) {
+            DiaryEntryResponse d = new DiaryEntryResponse();
+            d.setShowId(ep.getShowId());
+            d.setSeasonNumber(ep.getSeasonNumber());
+            d.setEpisodeNumber(ep.getEpisodeNumber());
+            d.setWatchDate(ep.getWatchDate());
+            d.setRating(ep.getRating());
+            d.setLiked(ep.isLiked());
+            d.setRewatch(ep.isRewatch());
+            d.setReview(ep.getReview());
+            d.setWholeShow(false);
+            entries.add(d);
+        }
+
+        for (UserShowStatus s : statusRepository.findByUserIdAndWatchDateIsNotNull(userId)) {
+            DiaryEntryResponse d = new DiaryEntryResponse();
+            d.setShowId(s.getShowId());
+            d.setSeasonNumber(null);
+            d.setEpisodeNumber(null);
+            d.setWatchDate(s.getWatchDate());
+            d.setRating(s.getRating());
+            d.setLiked(s.isFavorite());
+            d.setRewatch(s.isRewatch());
+            d.setReview(s.getReview());
+            d.setWholeShow(true);
+            entries.add(d);
+        }
+
+        entries.sort(Comparator.comparing(DiaryEntryResponse::getWatchDate).reversed());
+        return ResponseEntity.ok(entries);
     }
 
     @PostMapping("/toggle-favorite")

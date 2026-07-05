@@ -16,4 +16,7 @@ public interface UserShowStatusRepository extends JpaRepository<UserShowStatus, 
 
     // ამ შოუს ყველა "Whole Show" რივიუ (მხოლოდ ის, სადაც review დაწერილია)
     List<UserShowStatus> findByShowIdAndReviewIsNotNull(int showId);
+
+    // Diary: ამ იუზერის ყველა დათარიღებული whole-show ჩანაწერი
+    List<UserShowStatus> findByUserIdAndWatchDateIsNotNull(Long userId);
 }

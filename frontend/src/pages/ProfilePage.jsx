@@ -29,18 +29,8 @@ const ACTIVITY_FEED_PLACEHOLDER = [
 const FAVORITE_MOVIES_COUNT = 6;
 const FAVORITE_ACTORS_COUNT = 6;
 
-// No watch-log/diary feature exists on the backend yet, so these rows are
-// entirely fixed placeholder data until that exists.
-const DIARY_FILTERS = ['Rating', 'Diary Year', 'Decade', 'Genre', 'Service', 'Sort by Watched Date'];
-
-const DIARY_PLACEHOLDER = [
-    { monthBadge: { month: 'MAY', year: 2026 }, day: 16, title: 'The Amazing Spider-Man 2', released: 2014, rating: 0, liked: true },
-    { monthBadge: null, day: 15, title: 'Normal People', released: 2020, rating: 0, liked: true },
-    { monthBadge: { month: 'FEB', year: 2026 }, day: 16, title: 'Wuthering Heights', released: 2026, rating: 3, liked: false },
-    { monthBadge: { month: 'SEP', year: 2025 }, day: 20, title: 'Notting Hill', released: 1999, rating: 0, liked: true },
-    { monthBadge: null, day: 20, title: 'The Devil Wears Prada', released: 2006, rating: 4, liked: true },
-    { monthBadge: { month: 'MAR', year: 2024 }, day: 5, title: 'Eternal Sunshine of the Spotless Mind', released: 2004, rating: 5, liked: true },
-];
+// Diary is now backed by real logged watch-history (watchDate) from the
+// /api/tracking/diary endpoint. Sort/filter controls are wired to that data.
 
 // No "likes" feature exists on the backend yet either, so this tab is
 // genuinely empty (no fabricated rows) — just the filter chrome plus an
@@ -108,6 +98,133 @@ function GridIcon() {
     );
 }
 
+// Filter dropdown that looks like the original plain "LABEL ▾" span,
+// but opens a real menu. value === '' means "All".
+function DiaryDropdown({ label, value, options, onChange }) {
+    const [open, setOpen] = useState(false);
+    return (
+        <div className="pp-diary-dd">
+            <span
+                className="pp-diary-filter"
+                style={{ cursor: 'pointer', color: value ? '#00b4a2' : undefined }}
+                onClick={() => setOpen(o => !o)}
+            >
+                {value || label} ▾
+            </span>
+            {open && (
+                <>
+                    <div
+                        style={{ position: 'fixed', inset: 0, zIndex: 40 }}
+                        onClick={() => setOpen(false)}
+                    />
+                    <div className="pp-diary-dd-menu">
+                        <div
+                            className={`pp-diary-dd-item ${value === '' ? 'pp-diary-dd-item-active' : ''}`}
+                            onClick={() => { onChange(''); setOpen(false); }}
+                        >
+                            All
+                        </div>
+                        {options.map(opt => (
+                            <div
+                                key={opt}
+                                className={`pp-diary-dd-item ${value === opt ? 'pp-diary-dd-item-active' : ''}`}
+                                onClick={() => { onChange(opt); setOpen(false); }}
+                            >
+                                {opt}
+                            </div>
+                        ))}
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}
+
+// Edit an existing diary entry (rating / review / like / rewatch).
+// Saves via the same /api/log upsert, keeping watchDate so it stays in the diary.
+function DiaryEditModal({ entry, username, token, onClose, onSaved }) {
+    const [rating, setRating] = useState(entry.rating || 0);
+    const [hover, setHover] = useState(0);
+    const [review, setReview] = useState(entry.review || '');
+    const [liked, setLiked] = useState(!!entry.liked);
+    const [rewatch, setRewatch] = useState(!!entry.rewatch);
+    const [saving, setSaving] = useState(false);
+
+    const epLabel = (entry.seasonNumber != null && entry.episodeNumber != null)
+        ? ` S${entry.seasonNumber}E${entry.episodeNumber}` : '';
+
+    const save = () => {
+        setSaving(true);
+        const payload = {
+            username,
+            showId: entry.showId,
+            rating,
+            review,
+            liked,
+            wholeShow: false, // status-ს არ ვცვლით, მხოლოდ არსებულ ჩანაწერს ვანახლებთ
+            seasonNumber: entry.seasonNumber ?? null,
+            episodeNumber: entry.episodeNumber ?? null,
+            rewatch,
+            watchDate: entry.watchDate, // თარიღი რჩება, რომ diary-ში დარჩეს
+        };
+        fetch('https://localhost:8443/api/log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify(payload),
+        })
+            .then(r => { if (!r.ok) throw new Error('save failed'); onSaved(); onClose(); })
+            .catch(() => alert('Could not save review.'))
+            .finally(() => setSaving(false));
+    };
+
+    return (
+        <div className="pp-modal-overlay" onClick={onClose}>
+            <div className="pp-modal" onClick={e => e.stopPropagation()}>
+                <div className="pp-modal-header">
+                    <h3 className="pp-modal-title">{entry.title}{epLabel}</h3>
+                    <button className="pp-modal-close" onClick={onClose} aria-label="Close">✕</button>
+                </div>
+
+                <div className="pp-modal-stars">
+                    {[1, 2, 3, 4, 5].map(s => (
+                        <span
+                            key={s}
+                            onClick={() => setRating(s === rating ? 0 : s)}
+                            onMouseEnter={() => setHover(s)}
+                            onMouseLeave={() => setHover(0)}
+                            style={{ cursor: 'pointer', fontSize: '28px', color: s <= (hover || rating) ? '#f2b134' : '#3a4450' }}
+                        >
+                            ★
+                        </span>
+                    ))}
+                </div>
+
+                <textarea
+                    className="pp-modal-textarea"
+                    value={review}
+                    onChange={e => setReview(e.target.value)}
+                    placeholder="Write your review..."
+                />
+
+                <div className="pp-modal-toggles">
+                    <label className="pp-modal-check">
+                        <input type="checkbox" checked={liked} onChange={e => setLiked(e.target.checked)} /> Liked
+                    </label>
+                    <label className="pp-modal-check">
+                        <input type="checkbox" checked={rewatch} onChange={e => setRewatch(e.target.checked)} /> Rewatch
+                    </label>
+                </div>
+
+                <div className="pp-modal-footer">
+                    <button className="pp-modal-save" onClick={save} disabled={saving}>
+                        {saving ? 'Saving...' : 'Save'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function ProfilePage() {
     const navigate = useNavigate();
     const { username: routeUsername } = useParams();
@@ -127,6 +244,14 @@ export default function ProfilePage() {
 
     const [watchlistShowIds, setWatchlistShowIds] = useState([]);
     const [watchlistInfo, setWatchlistInfo] = useState({});
+
+    // Diary — რეალური, დათარიღებული ჩანაწერები + სორტი/ფილტრები
+    const [diaryEntries, setDiaryEntries] = useState([]);
+    const [diarySort, setDiarySort] = useState('date-desc'); // date-desc | date-asc | rating-desc | rating-asc
+    const [diaryYear, setDiaryYear] = useState('');
+    const [diaryDecade, setDiaryDecade] = useState('');
+    const [diaryGenre, setDiaryGenre] = useState('');
+    const [editingEntry, setEditingEntry] = useState(null); // Diary-ს რომელ ჩანაწერს ვასწორებთ
 
     const tokenObj = localStorage.getItem('token');
     const token = tokenObj ? JSON.parse(tokenObj).token : null;
@@ -148,10 +273,11 @@ export default function ProfilePage() {
 
         const authHeaders = { Authorization: `Bearer ${token}` };
 
-        // საჯარო მონაცემი (ნებისმიერი იუზერის): მეგობრები + watchlist
+        // საჯარო მონაცემი (ნებისმიერი იუზერის): მეგობრები + watchlist + diary
         const publicCalls = [
             fetch(`${FRIENDS_BASE_URL}?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`https://localhost:8443/api/tracking/watchlist?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+            fetch(`https://localhost:8443/api/tracking/diary?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
         ];
 
         // პირადი მონაცემი (მხოლოდ საკუთარ პროფილზე): requests, suggestions, recommendations
@@ -163,11 +289,13 @@ export default function ProfilePage() {
         ] : [];
 
         Promise.all([...publicCalls, ...privateCalls])
-            .then(([friendsList, watchlistIds, pendingList, sentList, suggestionsList, recsList]) => {
+            .then(([friendsList, watchlistIds, diaryList, pendingList, sentList, suggestionsList, recsList]) => {
                 setFriends(friendsList || []);
                 setFriendsCount((friendsList || []).length);
                 setWatchlistShowIds(watchlistIds || []);
                 (watchlistIds || []).forEach(ensureWatchlistShowInfo);
+                setDiaryEntries(diaryList || []);
+                (diaryList || []).forEach(e => ensureWatchlistShowInfo(e.showId));
                 setPending(pendingList || []);
                 setSent(sentList || []);
                 setSuggestions(suggestionsList || []);
@@ -193,6 +321,7 @@ export default function ProfilePage() {
                         name: data?.name || data?.title || `Show #${showId}`,
                         poster_path: data?.poster_path || null,
                         year: (data?.first_air_date || data?.release_date || '').slice(0, 4),
+                        genres: (data?.genres || []).map(g => g.name),
                     },
                 }));
             })
@@ -251,6 +380,43 @@ export default function ProfilePage() {
             headers: authHeaders,
         }).then(() => loadAll());
     };
+
+    // ── Diary: მონაცემს ვამდიდრებთ TMDB info-თი, ვფილტრავთ და ვასორტირებთ ──
+    const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const decadeOf = (releasedYear) => (releasedYear ? `${Math.floor(Number(releasedYear) / 10) * 10}s` : null);
+    // "2026-06-27" → "27 Jun 2026"
+    const formatDiaryDate = (wd) => {
+        if (!wd || wd.length < 10) return '';
+        const day = parseInt(wd.slice(8, 10), 10);
+        const mon = MONTHS_SHORT[parseInt(wd.slice(5, 7), 10) - 1] || '';
+        return `${day} ${mon} ${wd.slice(0, 4)}`;
+    };
+
+    const diaryDisplay = diaryEntries.map(e => {
+        const info = watchlistInfo[e.showId] || {};
+        return {
+            ...e,
+            title: info.name || `Show #${e.showId}`,
+            poster_path: info.poster_path || null,
+            released: info.year || '',
+            genres: info.genres || [],
+        };
+    });
+
+    const diaryYears = [...new Set(diaryDisplay.map(d => (d.watchDate || '').slice(0, 4)).filter(Boolean))].sort().reverse();
+    const diaryDecades = [...new Set(diaryDisplay.map(d => decadeOf(d.released)).filter(Boolean))].sort().reverse();
+    const diaryGenres = [...new Set(diaryDisplay.flatMap(d => d.genres))].sort();
+
+    const visibleDiary = diaryDisplay
+        .filter(d => !diaryYear || (d.watchDate || '').slice(0, 4) === diaryYear)
+        .filter(d => !diaryDecade || decadeOf(d.released) === diaryDecade)
+        .filter(d => !diaryGenre || d.genres.includes(diaryGenre))
+        .sort((a, b) => {
+            if (diarySort === 'date-asc') return (a.watchDate || '').localeCompare(b.watchDate || '');
+            if (diarySort === 'rating-desc') return (b.rating || 0) - (a.rating || 0);
+            if (diarySort === 'rating-asc') return (a.rating || 0) - (b.rating || 0);
+            return (b.watchDate || '').localeCompare(a.watchDate || ''); // date-desc (default)
+        });
 
     if (!username) {
         return (
@@ -487,60 +653,106 @@ export default function ProfilePage() {
                         <div className="pp-diary-header">
                             <h2 className="pp-diary-title">Diary</h2>
                             <div className="pp-diary-filters">
-                                {DIARY_FILTERS.map((f) => (
-                                    <span key={f} className="pp-diary-filter">{f} ▾</span>
-                                ))}
-                                <span className="pp-diary-eye" aria-label="Toggle visibility">👁</span>
+                                <span
+                                    className="pp-diary-filter"
+                                    style={{ cursor: 'pointer', color: diarySort.startsWith('rating') ? '#00b4a2' : undefined }}
+                                    onClick={() => setDiarySort(diarySort === 'rating-desc' ? 'rating-asc' : 'rating-desc')}
+                                >
+                                    Rating {diarySort === 'rating-asc' ? '▴' : '▾'}
+                                </span>
+                                <DiaryDropdown label="Year" value={diaryYear} options={diaryYears} onChange={setDiaryYear} />
+                                <DiaryDropdown label="Decade" value={diaryDecade} options={diaryDecades} onChange={setDiaryDecade} />
+                                <DiaryDropdown label="Genre" value={diaryGenre} options={diaryGenres} onChange={setDiaryGenre} />
+                                <span
+                                    className="pp-diary-filter"
+                                    style={{ cursor: 'pointer', color: diarySort.startsWith('date') ? '#00b4a2' : undefined }}
+                                    onClick={() => setDiarySort(diarySort === 'date-desc' ? 'date-asc' : 'date-desc')}
+                                >
+                                    Sort by Watched Date {diarySort === 'date-asc' ? '▴' : '▾'}
+                                </span>
                             </div>
                         </div>
 
-                        <div className="pp-diary-table">
-                            <div className="pp-diary-row pp-diary-row-head">
-                                <span className="pp-diary-col-month">Month</span>
-                                <span className="pp-diary-col-day">Day</span>
-                                <span className="pp-diary-col-film">Film</span>
-                                <span className="pp-diary-col-released">Released</span>
-                                <span className="pp-diary-col-rating">Rating</span>
-                                <span className="pp-diary-col-like">Like</span>
-                                <span className="pp-diary-col-rewatch">Rewatch</span>
-                                <span className="pp-diary-col-review">Review</span>
-                                <span className="pp-diary-col-edit">Edit</span>
+                        {visibleDiary.length === 0 ? (
+                            <div className="pp-likes-empty-box">
+                                <p className="pp-likes-empty-text">
+                                    {diaryEntries.length === 0 ? 'No diary entries yet' : 'Nothing matches these filters'}
+                                </p>
                             </div>
-
-                            {DIARY_PLACEHOLDER.map((entry, i) => (
-                                <div key={i} className="pp-diary-row">
-                                    <span className="pp-diary-col-month">
-                                        {entry.monthBadge && (
-                                            <span className="pp-diary-month-badge">
-                                                <span>{entry.monthBadge.month}</span>
-                                                <span>{entry.monthBadge.year}</span>
-                                            </span>
-                                        )}
-                                    </span>
-                                    <span className="pp-diary-col-day">{entry.day}</span>
-                                    <span className="pp-diary-col-film pp-diary-film-cell">
-                                        <span className="pp-diary-poster" />
-                                        <span className="pp-diary-film-title">{entry.title}</span>
-                                    </span>
-                                    <span className="pp-diary-col-released">{entry.released}</span>
-                                    <span className="pp-diary-col-rating pp-diary-stars">
-                                        <span className="pp-diary-stars-filled">{'★'.repeat(entry.rating)}</span>
-                                        <span className="pp-diary-stars-empty">{'★'.repeat(5 - entry.rating)}</span>
-                                    </span>
-                                    <span className="pp-diary-col-like">
-                                        <span className={`pp-diary-heart ${entry.liked ? 'pp-diary-heart-filled' : ''}`}>
-                                            <HeartIcon />
-                                        </span>
-                                    </span>
-                                    <span className="pp-diary-col-rewatch" />
-                                    <span className="pp-diary-col-review" />
-                                    <span className="pp-diary-col-edit">
-                                        <span className="pp-diary-edit-icon">✎</span>
-                                        <span className="pp-diary-edit-icon">&hellip;</span>
-                                    </span>
+                        ) : (
+                            <div className="pp-diary-table">
+                                <div className="pp-diary-row pp-diary-row-head">
+                                    <span className="pp-diary-col-date">Date</span>
+                                    <span className="pp-diary-col-film">Film</span>
+                                    <span className="pp-diary-col-released">Released</span>
+                                    <span className="pp-diary-col-rating">Rating</span>
+                                    <span className="pp-diary-col-like">Like</span>
+                                    <span className="pp-diary-col-rewatch">Rewatch</span>
+                                    <span className="pp-diary-col-review">Review</span>
+                                    <span className="pp-diary-col-edit">Edit</span>
                                 </div>
-                            ))}
-                        </div>
+
+                                {visibleDiary.map((entry, i) => {
+                                    const wd = entry.watchDate || '';
+                                    const rating = entry.rating || 0;
+                                    const epLabel = (entry.seasonNumber != null && entry.episodeNumber != null)
+                                        ? ` S${entry.seasonNumber}E${entry.episodeNumber}` : '';
+                                    return (
+                                        <div key={`${entry.showId}-${entry.seasonNumber}-${entry.episodeNumber}-${wd}-${i}`} className="pp-diary-row">
+                                            <span className="pp-diary-col-date">{formatDiaryDate(wd)}</span>
+                                            <span className="pp-diary-col-film pp-diary-film-cell">
+                                                {entry.poster_path ? (
+                                                    <img
+                                                        src={`${POSTER_BASE}${entry.poster_path}`}
+                                                        alt={entry.title}
+                                                        className="pp-diary-poster"
+                                                        style={{ cursor: 'pointer', objectFit: 'cover' }}
+                                                        onClick={() => navigate(`/shows/${entry.showId}`)}
+                                                    />
+                                                ) : (
+                                                    <span className="pp-diary-poster" />
+                                                )}
+                                                <span
+                                                    className="pp-diary-film-title"
+                                                    style={{ cursor: 'pointer' }}
+                                                    onClick={() => navigate(`/shows/${entry.showId}`)}
+                                                >
+                                                    {entry.title}{epLabel}
+                                                </span>
+                                            </span>
+                                            <span className="pp-diary-col-released">{entry.released}</span>
+                                            <span className="pp-diary-col-rating pp-diary-stars">
+                                                <span className="pp-diary-stars-filled">{'★'.repeat(rating)}</span>
+                                                <span className="pp-diary-stars-empty">{'★'.repeat(5 - rating)}</span>
+                                            </span>
+                                            <span className="pp-diary-col-like">
+                                                {entry.liked && (
+                                                    <span className="pp-diary-heart pp-diary-heart-filled">
+                                                        <HeartIcon />
+                                                    </span>
+                                                )}
+                                            </span>
+                                            <span className="pp-diary-col-rewatch">{entry.rewatch ? '↻' : ''}</span>
+                                            <span className="pp-diary-col-review" title={entry.review || ''}>
+                                                {entry.review || ''}
+                                            </span>
+                                            <span className="pp-diary-col-edit">
+                                                {isOwnProfile && (
+                                                    <span
+                                                        className="pp-diary-edit-icon"
+                                                        style={{ cursor: 'pointer' }}
+                                                        title="Edit review"
+                                                        onClick={() => setEditingEntry(entry)}
+                                                    >
+                                                        ✎
+                                                    </span>
+                                                )}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
                 ) : activeTab === 'likes' ? (
                     <div className="pp-likes">
@@ -747,6 +959,16 @@ export default function ProfilePage() {
                     </div>
                 )}
             </main>
+
+            {editingEntry && isOwnProfile && (
+                <DiaryEditModal
+                    entry={editingEntry}
+                    username={currentUsername}
+                    token={token}
+                    onClose={() => setEditingEntry(null)}
+                    onSaved={loadAll}
+                />
+            )}
         </div>
     );
 }
