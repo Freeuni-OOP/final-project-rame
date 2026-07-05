@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import '../style/ProfilePage.css';
 
 const FRIENDS_BASE_URL = 'https://localhost:8443/api/friends';
@@ -110,6 +110,7 @@ function GridIcon() {
 
 export default function ProfilePage() {
     const navigate = useNavigate();
+    const { username: routeUsername } = useParams();
     const [friendsCount, setFriendsCount] = useState(0);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('profile');
@@ -136,7 +137,9 @@ export default function ProfilePage() {
     };
 
     const decodedToken = parseJwt(token);
-    const username = decodedToken?.sub;
+    const currentUsername = decodedToken?.sub;      // ვინ არის ავტორიზებული
+    const username = routeUsername || currentUsername; // ვისი პროფილი იხსნება
+    const isOwnProfile = !routeUsername || routeUsername === currentUsername;
     const authHeaders = { Authorization: `Bearer ${token}` };
 
     const loadAll = () => {
@@ -145,23 +148,30 @@ export default function ProfilePage() {
 
         const authHeaders = { Authorization: `Bearer ${token}` };
 
-        Promise.all([
+        // საჯარო მონაცემი (ნებისმიერი იუზერის): მეგობრები + watchlist
+        const publicCalls = [
             fetch(`${FRIENDS_BASE_URL}?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+            fetch(`https://localhost:8443/api/tracking/watchlist?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+        ];
+
+        // პირადი მონაცემი (მხოლოდ საკუთარ პროფილზე): requests, suggestions, recommendations
+        const privateCalls = isOwnProfile ? [
             fetch(`${FRIENDS_BASE_URL}/pending?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`${FRIENDS_BASE_URL}/sent?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`${FRIENDS_BASE_URL}/suggestions?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`https://localhost:8443/api/tracking/recommendations?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-            fetch(`https://localhost:8443/api/tracking/watchlist?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : []))
-        ])
-            .then(([friendsList, pendingList, sentList, suggestionsList, recsList, watchlistIds]) => {
+        ] : [];
+
+        Promise.all([...publicCalls, ...privateCalls])
+            .then(([friendsList, watchlistIds, pendingList, sentList, suggestionsList, recsList]) => {
                 setFriends(friendsList || []);
                 setFriendsCount((friendsList || []).length);
+                setWatchlistShowIds(watchlistIds || []);
+                (watchlistIds || []).forEach(ensureWatchlistShowInfo);
                 setPending(pendingList || []);
                 setSent(sentList || []);
                 setSuggestions(suggestionsList || []);
                 setRecommendations(recsList || []);
-                setWatchlistShowIds(watchlistIds || []);
-                (watchlistIds || []).forEach(ensureWatchlistShowInfo);
             })
             .catch(err => console.error("Error loading profile data:", err))
             .finally(() => setLoading(false));
@@ -260,10 +270,12 @@ export default function ProfilePage() {
                         <Avatar name={username} size={110} />
                         <div className="pp-header-info">
                             <h1 className="pp-display-name">{username}</h1>
-                            <div className="pp-header-actions">
-                                <button className="pp-edit-btn">Edit Profile</button>
-                                <button className="pp-more-btn" aria-label="More options">&hellip;</button>
-                            </div>
+                            {isOwnProfile && (
+                                <div className="pp-header-actions">
+                                    <button className="pp-edit-btn">Edit Profile</button>
+                                    <button className="pp-more-btn" aria-label="More options">&hellip;</button>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -330,6 +342,7 @@ export default function ProfilePage() {
                                 </p>
                             </section>
                             {/* ================= 👇 ჩაამატე ეს ახალი სექცია ზუსტად აქ 👇 ================= */}
+                            {isOwnProfile && (
                             <section className="pp-block">
                                 <div className="pp-block-header">
                                     <span className="pp-block-title">Recommended by Friends</span>
@@ -397,6 +410,7 @@ export default function ProfilePage() {
                                     </div>
                                 )}
                             </section>
+                            )}
                             <section className="pp-block">
                                 <div className="pp-block-header">
                                     <span className="pp-block-title">Recent Activity</span>
@@ -420,6 +434,7 @@ export default function ProfilePage() {
                             </section>
                         </div>
 
+                        {isOwnProfile && (
                         <div className="pp-body-right">
                             <section className="pp-block">
                                 <div className="pp-block-header">
@@ -436,6 +451,7 @@ export default function ProfilePage() {
                                 </div>
                             </section>
                         </div>
+                        )}
                     </div>
                 ) : activeTab === 'favorites' ? (
                     <div className="pp-favorites">
@@ -584,14 +600,16 @@ export default function ProfilePage() {
                                                     onClick={() => navigate(`/shows/${showId}`)}
                                                 />
                                             )}
-                                            <button
-                                                type="button"
-                                                className="pp-watchlist-remove-btn"
-                                                title="Remove from watchlist"
-                                                onClick={() => handleRemoveFromWatchlist(showId)}
-                                            >
-                                                ✕
-                                            </button>
+                                            {isOwnProfile && (
+                                                <button
+                                                    type="button"
+                                                    className="pp-watchlist-remove-btn"
+                                                    title="Remove from watchlist"
+                                                    onClick={() => handleRemoveFromWatchlist(showId)}
+                                                >
+                                                    ✕
+                                                </button>
+                                            )}
                                             <div className="pp-watchlist-poster-caption">
                                                 <span className="pp-watchlist-poster-title">{info?.name || `Show #${showId}`}</span>
                                                 {info?.year && <span className="pp-watchlist-poster-year">{info.year}</span>}
@@ -631,6 +649,7 @@ export default function ProfilePage() {
                                 )}
                             </section>
 
+                            {isOwnProfile && (
                             <section className="pp-block pp-requests-col">
                                 <div className="pp-kicker">Requests</div>
                                 <div className="pp-requests-tabs">
@@ -694,8 +713,10 @@ export default function ProfilePage() {
                                     )}
                                 </div>
                             </section>
+                            )}
                         </div>
 
+                        {isOwnProfile && (
                         <section className="pp-block">
                             <div className="pp-kicker">People you may know</div>
                             {suggestions.length === 0 ? (
@@ -722,6 +743,7 @@ export default function ProfilePage() {
                                 </div>
                             )}
                         </section>
+                        )}
                     </div>
                 )}
             </main>

@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import '../style/ShowsDetailsPage.css';
 import RecommendButton from '../components/RecommendButton';
 import AddToListButton from '../components/AddToListButton';
 
 function ShowsDetailsPage() {
     const { id } = useParams();
+    const navigate = useNavigate();
     const [showData, setShowData] = useState(null);
     const [activeStatus, setActiveStatus] = useState(null);
     const [isFavorite, setIsFavorite] = useState(false);
@@ -240,12 +241,29 @@ function ShowsDetailsPage() {
         const badge = r.seasonNumber != null && r.episodeNumber != null
             ? `S${r.seasonNumber} E${r.episodeNumber}`
             : 'Whole show';
+        const goToProfile = () => {
+            if (r.username) navigate(`/profile/${r.username}`);
+        };
         return (
             <div key={i} className="review-item">
-                <div className="review-avatar">{initial}</div>
+                <div
+                    className="review-avatar"
+                    onClick={goToProfile}
+                    style={{ cursor: 'pointer' }}
+                    title={`View ${r.username}'s profile`}
+                >
+                    {initial}
+                </div>
                 <div className="review-body">
                     <div className="review-header">
-                        <span className="review-author">{r.username}</span>
+                        <span
+                            className="review-author"
+                            onClick={goToProfile}
+                            style={{ cursor: 'pointer' }}
+                            title={`View ${r.username}'s profile`}
+                        >
+                            {r.username}
+                        </span>
                         {r.rating != null && r.rating > 0 && (
                             <span className="review-stars">{'\u2605'.repeat(r.rating)}</span>
                         )}
