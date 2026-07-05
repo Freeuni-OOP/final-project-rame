@@ -42,8 +42,8 @@ public class UserEpisodeStatus {
     public void setSeasonNumber(int seasonNumber) { this.seasonNumber = seasonNumber; }
     public int getEpisodeNumber() { return episodeNumber; }
     public void setEpisodeNumber(int episodeNumber) { this.episodeNumber = episodeNumber; }
-    public int getRating() { return rating; }
-    public void setRating(int rating) { this.rating = rating; }
+    public Integer getRating() { return rating; }
+    public void setRating(Integer rating) { this.rating = rating; }
 
     public String getReview() { return review; }
     public void setReview(String review) { this.review = review; }

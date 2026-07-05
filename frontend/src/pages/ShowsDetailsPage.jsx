@@ -12,8 +12,10 @@ function ShowsDetailsPage() {
     const [watchedEpisodes, setWatchedEpisodes] = useState([]);
     const [selectedSeason, setSelectedSeason] = useState(1);
     const [seasonEpisodes, setSeasonEpisodes] = useState([]);
+    const [reviews, setReviews] = useState([]);
 
-    // 🟢 ტოკენისა და იუზერნეიმის სტაბილური ამოღება
+    const carouselRef = useRef(null);
+
     const tokenObj = localStorage.getItem('token');
     const token = tokenObj ? JSON.parse(tokenObj).token : null;
 
@@ -36,6 +38,38 @@ function ShowsDetailsPage() {
             .catch(err => console.error("Error fetching show:", err));
     }, [id]);
 
+    // Fetch reviews - filtered by last watched episode (spoiler protection)
+    useEffect(() => {
+        const params = new URLSearchParams();
+        if (username) params.append('username', username);
+
+        let lastSeason = null;
+        let lastEpisode = null;
+        if (watchedEpisodes.length > 0) {
+            watchedEpisodes.forEach(ep => {
+                if (lastSeason === null ||
+                    ep.seasonNumber > lastSeason ||
+                    (ep.seasonNumber === lastSeason && ep.episodeNumber > lastEpisode)) {
+                    lastSeason = ep.seasonNumber;
+                    lastEpisode = ep.episodeNumber;
+                }
+            });
+        }
+
+        if (lastSeason !== null && lastEpisode !== null) {
+            params.append('season', lastSeason);
+            params.append('episode', lastEpisode);
+        }
+
+        fetch(`https://localhost:8443/api/reviews/${id}?${params.toString()}`)
+            .then(res => res.ok ? res.json() : [])
+            .then(data => setReviews(data || []))
+            .catch(err => {
+                console.error("Error fetching reviews:", err);
+                setReviews([]);
+            });
+    }, [id, username, watchedEpisodes]);
+
     useEffect(() => {
         fetch(`https://localhost:8443/api/shows/${id}/season/${selectedSeason}`)
             .then(res => res.json())
@@ -47,7 +81,6 @@ function ShowsDetailsPage() {
                 setSeasonEpisodes([]);
             });
 
-        // ⚡ თუ იუზერნეიმი არსებობს, მხოლოდ მაშინ მოგვაქვს მონაცემები
         if (username) {
             fetch(`https://localhost:8443/api/tracking/watched-episodes?username=${username}&showId=${id}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -183,8 +216,6 @@ function ShowsDetailsPage() {
         return watchedEpisodes.some(ep => ep.seasonNumber === seasonNum && ep.episodeNumber === episodeNum);
     };
 
-    const carouselRef = useRef(null);
-
     const scrollCarousel = (direction) => {
         if (carouselRef.current) {
             const scrollAmount = direction === 'left' ? -600 : 600;
@@ -200,6 +231,33 @@ function ShowsDetailsPage() {
     const backdropUrl = showData.backdrop_path
         ? `https://image.tmdb.org/t/p/original${showData.backdrop_path}`
         : '';
+
+    const friendReviews = reviews.filter(r => r.friend);
+    const otherReviews = reviews.filter(r => !r.friend);
+
+    const renderReview = (r, i) => {
+        const initial = r.username ? r.username.charAt(0).toUpperCase() : '?';
+        const badge = r.seasonNumber != null && r.episodeNumber != null
+            ? `S${r.seasonNumber} E${r.episodeNumber}`
+            : 'Whole show';
+        return (
+            <div key={i} className="review-item">
+                <div className="review-avatar">{initial}</div>
+                <div className="review-body">
+                    <div className="review-header">
+                        <span className="review-author">{r.username}</span>
+                        {r.rating != null && r.rating > 0 && (
+                            <span className="review-stars">{'\u2605'.repeat(r.rating)}</span>
+                        )}
+                        {r.liked && <span className="review-heart">{'\u2665'}</span>}
+                        {badge && <span className="review-badge">{badge}</span>}
+                        {r.rewatch && <span className="review-rewatch">{'\u21bb'} rewatch</span>}
+                    </div>
+                    {r.review && <p className="review-text">{r.review}</p>}
+                </div>
+            </div>
+        );
+    };
 
     return (
         <div className="details-page-wrapper">
@@ -238,7 +296,7 @@ function ShowsDetailsPage() {
                                     }`}
                                     title="Mark as Watched / Watching"
                                 >
-                                    👁
+                                    {'\ud83d\udc41'}
                                 </button>
 
                                 <button
@@ -246,7 +304,7 @@ function ShowsDetailsPage() {
                                     className={`action-icon heart-icon ${isFavorite ? 'active' : ''}`}
                                     title="Favorite"
                                 >
-                                    {isFavorite ? '❤️' : '♡'}
+                                    {isFavorite ? '\u2764\ufe0f' : '\u2661'}
                                 </button>
 
                                 <button
@@ -254,7 +312,7 @@ function ShowsDetailsPage() {
                                     className={`action-icon star-icon ${activeStatus === 'PLAN_TO_WATCH' ? 'active' : ''}`}
                                     title="Plan to Watch"
                                 >
-                                    ★
+                                    {'\u2605'}
                                 </button>
 
                                 <button
@@ -262,11 +320,11 @@ function ShowsDetailsPage() {
                                     className={`action-icon drop-icon ${activeStatus === 'DROPPED' ? 'active' : ''}`}
                                     title="Dropped"
                                 >
-                                    ✕
+                                    {'\u2715'}
                                 </button>
                             </div>
 
-                            <button className="design-btn log-btn">➕ LOG</button>
+                            <button className="design-btn log-btn">{'\u2795'} LOG</button>
                             <AddToListButton showId={showData.id} showName={showData.name} />
 
                             <RecommendButton showId={showData.id} showName={showData.name} />
@@ -276,7 +334,7 @@ function ShowsDetailsPage() {
 
                 <main className="right-panel">
                     <h1 className="show-title-main">{showData.name}</h1>
-                    <div className="show-rating-main">⭐ {showData.vote_average?.toFixed(1)} / 10</div>
+                    <div className="show-rating-main">{'\u2b50'} {showData.vote_average?.toFixed(1)} / 10</div>
                     <p className="show-overview-main">{showData.overview}</p>
 
                     <div className="placeholder-tabs"></div>
@@ -291,14 +349,14 @@ function ShowsDetailsPage() {
                             >
                                 {showData.seasons?.map(s => (
                                     <option key={s.id} value={s.season_number}>
-                                        ▾ Seasons ({s.season_number})
+                                        {'\u25be'} Seasons ({s.season_number})
                                     </option>
                                 ))}
                             </select>
                         </div>
 
                         <div className="carousel-wrapper-relative">
-                            <button className="carousel-arrow-btn left-arrow" onClick={() => scrollCarousel('left')}>⟨</button>
+                            <button className="carousel-arrow-btn left-arrow" onClick={() => scrollCarousel('left')}>{'\u27e8'}</button>
 
                             <div className="episodes-carousel-track" ref={carouselRef}>
                                 {seasonEpisodes?.map((episode) => {
@@ -317,11 +375,11 @@ function ShowsDetailsPage() {
                                                     className={`ep-hover-overlay ${isWatched ? 'is-watched' : ''}`}
                                                     onClick={() => handleEpisodeToggle(selectedSeason, episode.episode_number)}
                                                 >
-                                                    <span className="ep-hover-eye-icon">{isWatched ? '✓' : '👁'}</span>
+                                                    <span className="ep-hover-eye-icon">{isWatched ? '\u2713' : '\ud83d\udc41'}</span>
                                                 </div>
 
                                                 {episode.vote_average > 0 && (
-                                                    <div className="ep-card-rating">⭐ {episode.vote_average.toFixed(1)}</div>
+                                                    <div className="ep-card-rating">{'\u2b50'} {episode.vote_average.toFixed(1)}</div>
                                                 )}
                                             </div>
 
@@ -334,11 +392,25 @@ function ShowsDetailsPage() {
                                 })}
                             </div>
 
-                            <button className="carousel-arrow-btn right-arrow" onClick={() => scrollCarousel('right')}>⟩</button>
+                            <button className="carousel-arrow-btn right-arrow" onClick={() => scrollCarousel('right')}>{'\u27e9'}</button>
                         </div>
                     </div>
 
-                    <div className="reviews-section-future" style={{ marginTop: '50px', paddingBottom: '100px' }}></div>
+                    <div className="reviews-section" style={{ marginTop: '50px', paddingBottom: '100px' }}>
+                        <div className="reviews-block">
+                            <div className="reviews-heading">Friends' reviews</div>
+                            {friendReviews.length > 0
+                                ? friendReviews.map(renderReview)
+                                : <p className="reviews-empty">None of your friends have reviewed this yet</p>}
+                        </div>
+
+                        <div className="reviews-block" style={{ marginTop: '40px' }}>
+                            <div className="reviews-heading">All reviews</div>
+                            {otherReviews.length > 0
+                                ? otherReviews.map(renderReview)
+                                : <p className="reviews-empty">No reviews yet</p>}
+                        </div>
+                    </div>
                 </main>
             </div>
         </div>
