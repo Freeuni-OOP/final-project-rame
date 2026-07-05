@@ -149,37 +149,34 @@ export default function ProfilePage() {
 
         const authHeaders = { Authorization: `Bearer ${token}` };
 
-        const publicCalls = Promise.all([
+        const publicCalls = [
             fetch(`${FRIENDS_BASE_URL}?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`https://localhost:8443/api/tracking/watchlist?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-        ]);
+        ];
 
-        // პირადი მონაცემი (მხოლოდ საკუთარ პროფილზე): requests, suggestions, recommendations
+        // პირადი მონაცემები (მხოლოდ საკუთარ პროფილზე)
         const privateCalls = isOwnProfile ? [
             fetch(`${FRIENDS_BASE_URL}/pending?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`${FRIENDS_BASE_URL}/sent?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`${FRIENDS_BASE_URL}/suggestions?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`https://localhost:8443/api/tracking/recommendations?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-            fetch(`https://localhost:8443/api/tracking/activity?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-            fetch(`https://localhost:8443/api/tracking/watchlist?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : []))
-        ])
-            .then(([friendsList, pendingList, sentList, suggestionsList, recsList, activityList, watchlistIds]) => {
-                // შეცვლილია SetFriends -> setFriends, და ა.შ. (ყველა სეტერი პატარა ასოთი)
+            fetch(`https://localhost:8443/api/tracking/activity?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : []))
         ] : [];
 
         Promise.all([...publicCalls, ...privateCalls])
-            .then(([friendsList, watchlistIds, pendingList, sentList, suggestionsList, recsList]) => {
+            .then(([friendsList, watchlistIds, pendingList = [], sentList = [], suggestionsList = [], recsList = [], activityList = []]) => {
                 setFriends(friendsList || []);
                 setFriendsCount((friendsList || []).length);
                 setWatchlistShowIds(watchlistIds || []);
                 (watchlistIds || []).forEach(ensureWatchlistShowInfo);
-                setPending(pendingList || []);
-                setSent(sentList || []);
-                setSuggestions(suggestionsList || []);
-                setRecommendations(recsList || []);
-                setActivities((activityList || []).sort((a, b) => b.id - a.id));
-                setWatchlistShowIds(watchlistIds || []);
-                (watchlistIds || []).forEach(ensureWatchlistShowInfo);
+                
+                if (isOwnProfile) {
+                    setPending(pendingList || []);
+                    setSent(sentList || []);
+                    setSuggestions(suggestionsList || []);
+                    setRecommendations(recsList || []);
+                    setActivities((activityList || []).sort((a, b) => b.id - a.id));
+                }
             })
             .catch(err => console.error("Error loading profile data:", err))
             .finally(() => setLoading(false));
