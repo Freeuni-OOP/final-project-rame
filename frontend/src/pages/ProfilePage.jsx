@@ -4,10 +4,8 @@ import '../style/ProfilePage.css';
 
 const FRIENDS_BASE_URL = 'https://localhost:8443/api/friends';
 
-// The backend has no "films watched" / "favorite films" feature yet, so
-// this is a deliberately fixed placeholder until that exists. Friends
-// count below is real (pulled from the Friends endpoint).
-const PLACEHOLDER_FILMS_COUNT = 0;
+// "Films" = number of shows the user has fully watched (COMPLETED),
+// pulled live from the /api/tracking/films-count endpoint.
 
 // No "favorite movies/actors" feature exists on the backend yet, so this
 // tab is entirely fixed placeholder shapes/counts until that data exists.
@@ -212,6 +210,7 @@ export default function ProfilePage() {
     const navigate = useNavigate();
     const { username: routeUsername } = useParams();
     const [friendsCount, setFriendsCount] = useState(0);
+    const [filmsCount, setFilmsCount] = useState(0);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('profile');
     const [likesSubTab, setLikesSubTab] = useState('Films');
@@ -262,6 +261,7 @@ export default function ProfilePage() {
             fetch(`${FRIENDS_BASE_URL}?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`https://localhost:8443/api/tracking/watchlist?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`https://localhost:8443/api/tracking/diary?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+            fetch(`https://localhost:8443/api/tracking/films-count?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : 0)),
         ];
 
         // Private data (own profile only)
@@ -274,10 +274,11 @@ export default function ProfilePage() {
         ] : [];
 
         Promise.all([...publicCalls, ...privateCalls])
-    .then(([friendsList, watchlistIds, diaryList, pendingList = [], sentlist = [], suggestionslist = [], recsList = [], activityList = []]) => {
-        
+    .then(([friendsList, watchlistIds, diaryList, filmsCountVal = 0, pendingList = [], sentlist = [], suggestionslist = [], recsList = [], activityList = []]) => {
+
         setFriends(friendsList || []);
         setFriendsCount((friendsList || []).length);
+        setFilmsCount(Number(filmsCountVal) || 0);
         setWatchlistShowIds(watchlistIds || []);
         (watchlistIds || []).forEach(ensureWatchlistShowInfo);
 
@@ -438,7 +439,7 @@ export default function ProfilePage() {
 
                     <div className="pp-stats">
                         <div className="pp-stat-item">
-                            <span className="pp-stat-num">{PLACEHOLDER_FILMS_COUNT}</span>
+                            <span className="pp-stat-num">{loading ? '–' : filmsCount}</span>
                             <span className="pp-stat-label">Films</span>
                         </div>
                         <div className="pp-stat-item">
