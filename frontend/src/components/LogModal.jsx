@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, ArrowLeft, Heart, Star } from 'lucide-react';
 import '../style/LogModal.css';
 
-export default function LogModal({ onClose }) {
+export default function LogModal({ onClose, initialShow = null, onSaved }) {
     const [step, setStep] = useState(1);
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
@@ -94,6 +94,14 @@ export default function LogModal({ onClose }) {
         }
     };
 
+    // თუ modal კონკრეტული სერიალიდან გაიხსნა (show details გვერდი) — search გამოვტოვოთ
+    useEffect(() => {
+        if (initialShow && initialShow.id) {
+            handleSelectShow(initialShow);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     const handleSeasonChange = (e) => {
         const value = e.target.value;
         setSelectedSeason(value);
@@ -135,19 +143,24 @@ export default function LogModal({ onClose }) {
 
         const isWholeShow = selectedSeason === WHOLE_SHOW;
 
+        // 🟢 1. ვპოულობთ ორიგინალ შედეგს ძებნიდან, რომ წამოვიღოთ სუფთა poster_path ბექენდისთვის
+        const originalShow = searchResults.find(s => s.id === selectedShow.id);
+        const purePosterPath = originalShow ? originalShow.poster_path : null;
+
+        // ✍️ 2. ვამატებთ posterPath-ს payload-ში
         const payload = {
             username,
             showId: selectedShow.id,
+            showName: selectedShow.title,
             rating,
             review,
             liked: isLiked,
-            // 🌟 თუ "Whole TV Show" — wholeShow=true, ხოლო სეზონი/ეპიზოდი null
             wholeShow: isWholeShow,
             seasonNumber: (!isWholeShow && selectedSeason) ? parseInt(selectedSeason, 10) : null,
             episodeNumber: (!isWholeShow && selectedEpisode) ? parseInt(selectedEpisode, 10) : null,
-            // 🌟 ახალი: diary — rewatch + watchDate (მხოლოდ თუ "Add to your diary?" მონიშნულია)
             rewatch: specifyDate ? rewatch : false,
-            watchDate: specifyDate ? watchDate : null
+            watchDate: specifyDate ? watchDate : null,
+            posterPath: purePosterPath // 🟢 ჩამატებულია!
         };
 
         console.log("Saving log payload:", payload);
@@ -164,6 +177,7 @@ export default function LogModal({ onClose }) {
             .then((res) => {
                 console.log("Save response status:", res.status);
                 if (!res.ok) throw new Error('Save failed: ' + res.status);
+                if (onSaved) onSaved();
                 onClose();
             })
             .catch((err) => {

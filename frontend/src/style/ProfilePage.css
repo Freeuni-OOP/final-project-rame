@@ -195,18 +195,28 @@
     color: #dce6ef;
 }
 
-/* ---------- recent activity grid ---------- */
+/* ---------- recent activity grid & cards ---------- */
 .pp-activity-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 16px;
+    width: 100%;
+}
+
+.pp-activity-item-wrapper:hover .pp-activity-poster {
+    transform: translateY(-2px);
+    transition: transform 0.2s ease;
 }
 
 .pp-activity-poster {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    justify-content: flex-start;
+    width: 100%;
+    height: 380px;
+    position: relative;
+    cursor: pointer;
 }
 
 .pp-poster-placeholder-lg {
@@ -215,6 +225,50 @@
     border-radius: 6px;
     background: linear-gradient(160deg, rgba(0, 180, 162, 0.3), rgba(91, 141, 239, 0.2));
     border: 1px solid rgba(255, 255, 255, 0.06);
+    overflow: hidden;
+    position: relative;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.pp-activity-poster:hover .pp-poster-placeholder-lg {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+}
+
+.pp-poster-title-hover {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(12, 24, 36, 0.85);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 12px;
+    box-sizing: border-box;
+    color: #ffffff;
+    font-size: 0.95rem;
+    font-weight: 600;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+}
+
+.pp-activity-poster:hover .pp-poster-title-hover {
+    opacity: 1;
+}
+
+.pp-poster-footer-info {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding-top: 6px;
 }
 
 .pp-poster-indicator {
@@ -223,6 +277,7 @@
     justify-content: center;
     color: #5f758a;
     font-size: 0.85rem;
+    width: 100%;
 }
 
 .pp-poster-like {
@@ -232,6 +287,136 @@
 .pp-poster-stars {
     color: #f2b134;
     letter-spacing: 1px;
+    font-size: 0.8rem;
+}
+
+/* Activity Info Extra Layer Blocks */
+.activity-info-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    width: 100%;
+}
+
+.status-row {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+}
+
+.meta-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    height: 24px;
+    width: 100%;
+}
+
+.stars-container {
+    color: #ffb400;
+    font-size: 14px;
+    letter-spacing: 2px;
+}
+
+.heart-icon {
+    font-size: 16px;
+    display: inline-flex;
+    align-items: center;
+}
+
+/* Status Badges */
+.pp-status-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: bold;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.status-completed {
+    background-color: rgba(0, 224, 84, 0.15);
+    color: #00e054;
+    border: 1px solid rgba(0, 224, 84, 0.3);
+}
+
+.status-watching {
+    background-color: rgba(64, 169, 255, 0.15);
+    color: #40a9ff;
+    border: 1px solid rgba(64, 169, 255, 0.3);
+}
+
+.status-dropped {
+    background-color: rgba(255, 77, 79, 0.15);
+    color: #ff4d4f;
+    border: 1px solid rgba(255, 77, 79, 0.3);
+}
+
+.status-plan {
+    background-color: rgba(255, 192, 105, 0.15);
+    color: #ffc069;
+    border: 1px solid rgba(255, 192, 105, 0.3);
+}
+
+/* Alternate Activity Row Items */
+.activity-card-row {
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 12px;
+    transition: background 0.2s ease;
+    cursor: pointer;
+}
+
+.activity-card-row:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.activity-mini-poster {
+    width: 50px;
+    height: 75px;
+    object-fit: cover;
+    border-radius: 4px;
+    margin-right: 15px;
+}
+
+.activity-details-box {
+    flex-grow: 1;
+}
+
+.activity-show-title {
+    margin: 0 0 4px 0;
+    color: #fff;
+    font-size: 1.1rem;
+}
+
+.activity-action-text {
+    margin: 0 0 6px 0;
+    color: #99aabb;
+    font-size: 0.9rem;
+}
+
+.activity-time-stamp {
+    font-size: 0.8rem;
+    color: #667788;
+}
+
+.activity-heart-badge {
+    font-size: 1.5rem;
+}
+
+.activity-stars-badge {
+    color: #ffcc00;
+    font-size: 1.2rem;
+    letter-spacing: 2px;
 }
 
 /* ---------- activity feed (right column) ---------- */
@@ -746,6 +931,76 @@
     margin-bottom: 18px;
 }
 
+.pp-watchlist-poster-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 22px 16px;
+    margin-top: 4px;
+}
+
+.pp-watchlist-poster-item {
+    position: relative;
+}
+
+.pp-watchlist-poster {
+    width: 100%;
+    aspect-ratio: 2 / 3;
+    border-radius: 6px;
+    object-fit: cover;
+    background: #1c2530;
+    display: block;
+    cursor: pointer;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.pp-watchlist-poster-placeholder {
+    background: linear-gradient(160deg, rgba(0, 180, 162, 0.32), rgba(91, 141, 239, 0.22));
+}
+
+.pp-watchlist-remove-btn {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(10, 14, 20, 0.75);
+    color: #dce6ef;
+    font-size: 11px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.pp-watchlist-poster-item:hover .pp-watchlist-remove-btn {
+    opacity: 1;
+}
+
+.pp-watchlist-remove-btn:hover {
+    background: #ff4444;
+}
+
+.pp-watchlist-poster-caption {
+    margin-top: 8px;
+}
+
+.pp-watchlist-poster-title {
+    display: block;
+    color: #dce6ef;
+    font-size: 0.82rem;
+    font-weight: 600;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pp-watchlist-poster-year {
+    color: #5f758a;
+    font-size: 0.75rem;
+}
+
 /* ---------- network tab ---------- */
 .pp-kicker {
     color: #5f758a;
@@ -1025,9 +1280,19 @@
 }
 
 /* ---------- responsive ---------- */
+@media (max-width: 1100px) {
+    .pp-watchlist-poster-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
 @media (max-width: 880px) {
     .pp-body, .pp-network-row {
         grid-template-columns: 1fr;
+    }
+
+    .pp-watchlist-poster-grid {
+        grid-template-columns: repeat(3, 1fr);
     }
 }
 
@@ -1061,95 +1326,8 @@
     }
 }
 
-/* ---------- watchlist poster grid (real PLAN_TO_WATCH data) ---------- */
-.pp-watchlist-poster-grid {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 22px 16px;
-    margin-top: 4px;
-}
-
-.pp-watchlist-poster-item {
-    position: relative;
-}
-
-.pp-watchlist-poster {
-    width: 100%;
-    aspect-ratio: 2 / 3;
-    border-radius: 6px;
-    object-fit: cover;
-    background: #1c2530;
-    display: block;
-    cursor: pointer;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.pp-watchlist-poster-placeholder {
-    background: linear-gradient(160deg, rgba(0, 180, 162, 0.32), rgba(91, 141, 239, 0.22));
-}
-
-.pp-watchlist-remove-btn {
-    position: absolute;
-    top: 6px;
-    right: 6px;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    border: none;
-    background: rgba(10, 14, 20, 0.75);
-    color: #dce6ef;
-    font-size: 11px;
-    cursor: pointer;
-    opacity: 0;
-    transition: opacity 0.15s ease, background 0.15s ease;
-}
-
-.pp-watchlist-poster-item:hover .pp-watchlist-remove-btn {
-    opacity: 1;
-}
-
-.pp-watchlist-remove-btn:hover {
-    background: #ff4444;
-}
-
-.pp-watchlist-poster-caption {
-    margin-top: 8px;
-}
-
-.pp-watchlist-poster-title {
-    display: block;
-    color: #dce6ef;
-    font-size: 0.82rem;
-    font-weight: 600;
-    line-height: 1.3;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.pp-watchlist-poster-year {
-    color: #5f758a;
-    font-size: 0.75rem;
-}
-
-@media (max-width: 1100px) {
-    .pp-watchlist-poster-grid {
-        grid-template-columns: repeat(4, 1fr);
-    }
-}
-
-@media (max-width: 880px) {
-    .pp-watchlist-poster-grid {
-        grid-template-columns: repeat(3, 1fr);
-    }
-}
-
 @media (max-width: 560px) {
     .pp-watchlist-poster-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-watchlist-poster-grid {
         grid-template-columns: repeat(2, 1fr);
     }
 }

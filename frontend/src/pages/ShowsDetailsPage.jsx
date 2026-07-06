@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import '../style/ShowsDetailsPage.css';
 import RecommendButton from '../components/RecommendButton';
 import AddToListButton from '../components/AddToListButton';
+import LogModal from '../components/LogModal';
 
 function ShowsDetailsPage() {
     const { id } = useParams();
@@ -14,6 +15,8 @@ function ShowsDetailsPage() {
     const [selectedSeason, setSelectedSeason] = useState(1);
     const [seasonEpisodes, setSeasonEpisodes] = useState([]);
     const [reviews, setReviews] = useState([]);
+    const [showLogModal, setShowLogModal] = useState(false);
+    const [reviewsRefreshKey, setReviewsRefreshKey] = useState(0);
 
     const carouselRef = useRef(null);
 
@@ -69,7 +72,7 @@ function ShowsDetailsPage() {
                 console.error("Error fetching reviews:", err);
                 setReviews([]);
             });
-    }, [id, username, watchedEpisodes]);
+    }, [id, username, watchedEpisodes, reviewsRefreshKey]);
 
     useEffect(() => {
         fetch(`https://localhost:8443/api/shows/${id}/season/${selectedSeason}`)
@@ -123,8 +126,9 @@ function ShowsDetailsPage() {
         const newStatus = activeStatus === statusName ? null : statusName;
         setActiveStatus(newStatus);
 
-        fetch(`https://localhost:8443/api/tracking/show-status?username=${username}&showId=${id}&status=${newStatus !== null ? newStatus : ''}`, {
-            method: 'POST',
+        const currentShowName = showData?.name ? showData.name : `Show #${id}`;
+
+        fetch(`https://localhost:8443/api/tracking/show-status?username=${username}&showId=${id}&status=${newStatus !== null ? newStatus : ''}&showName=${encodeURIComponent(currentShowName)}&posterPath=${encodeURIComponent(showData?.poster_path || '')}`, {            method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`
             }
@@ -177,7 +181,7 @@ function ShowsDetailsPage() {
         if (!username) return;
         setIsFavorite(!isFavorite);
 
-        fetch(`https://localhost:8443/api/tracking/toggle-favorite?username=${username}&showId=${id}`, {
+        fetch(`https://localhost:8443/api/tracking/toggle-favorite?username=${username}&showId=${id}&showName=${encodeURIComponent(showData.name)}`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` }
         })
@@ -195,10 +199,10 @@ function ShowsDetailsPage() {
             }).catch(err => console.error(err));
         }
 
-        fetch(`https://localhost:8443/api/tracking/toggle-episode?username=${username}&showId=${id}&seasonNumber=${seasonNum}&episodeNumber=${episodeNum}`, {
+        fetch(`https://localhost:8443/api/tracking/show-status?username=${username}&showId=${id}&status=WATCHING&showName=${encodeURIComponent(showData.name)}`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` }
-        })
+        }).catch(err => console.error(err))
             .then(() => {
                 const isAlreadyWatched = watchedEpisodes.some(ep => ep.seasonNumber === seasonNum && ep.episodeNumber === episodeNum);
                 if (isAlreadyWatched) {
@@ -342,7 +346,7 @@ function ShowsDetailsPage() {
                                 </button>
                             </div>
 
-                            <button className="design-btn log-btn">{'\u2795'} LOG</button>
+                            <button className="design-btn log-btn" onClick={() => setShowLogModal(true)}>{'\u2795'} LOG</button>
                             <AddToListButton showId={showData.id} showName={showData.name} />
 
                             <RecommendButton showId={showData.id} showName={showData.name} />
@@ -431,6 +435,14 @@ function ShowsDetailsPage() {
                     </div>
                 </main>
             </div>
+
+            {showLogModal && (
+                <LogModal
+                    initialShow={showData}
+                    onClose={() => setShowLogModal(false)}
+                    onSaved={() => setReviewsRefreshKey(k => k + 1)}
+                />
+            )}
         </div>
     );
 }

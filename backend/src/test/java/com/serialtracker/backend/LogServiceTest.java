@@ -36,11 +36,14 @@ class LogServiceTest {
     private UserShowStatusRepository showStatusRepository;
     @Mock
     private UserEpisodeStatusRepository episodeStatusRepository;
+    @Mock
+    private com.serialtracker.backend.repository.ActivityRepository activityRepository;
 
     @InjectMocks
     private LogService logService;
 
     private User testUser;
+
 
     @BeforeEach
     void setUp() {

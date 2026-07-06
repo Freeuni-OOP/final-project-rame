@@ -11,6 +11,11 @@ public class LogRequest {
     private Boolean wholeShow;
     private Boolean rewatch;
     private String watchDate;
+    private String showName;
+    private String posterPath;
+
+    public String getPosterPath() { return posterPath; }
+    public void setPosterPath(String posterPath) { this.posterPath = posterPath; }
 
     public Boolean getRewatch() { return rewatch; }
     public void setRewatch(Boolean rewatch) { this.rewatch = rewatch; }
@@ -41,4 +46,7 @@ public class LogRequest {
 
     public Integer getEpisodeNumber() { return episodeNumber; }
     public void setEpisodeNumber(Integer episodeNumber) { this.episodeNumber = episodeNumber; }
+
+    public String getShowName() { return showName; }
+    public void setShowName(String showName) { this.showName = showName; }
 }

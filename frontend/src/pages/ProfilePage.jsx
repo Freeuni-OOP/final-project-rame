@@ -4,25 +4,10 @@ import '../style/ProfilePage.css';
 
 const FRIENDS_BASE_URL = 'https://localhost:8443/api/friends';
 
-// The backend has no "films watched" / "favorite films" / activity-log
-// feature yet, so these are deliberately fixed placeholders until that
-// exists. Friends count below is real (pulled from the Friends endpoint).
+// The backend has no "films watched" / "favorite films" feature yet, so
+// this is a deliberately fixed placeholder until that exists. Friends
+// count below is real (pulled from the Friends endpoint).
 const PLACEHOLDER_FILMS_COUNT = 0;
-
-const RECENT_ACTIVITY_GRID = [
-    { type: 'like' },
-    { type: 'like' },
-    { type: 'rating', stars: 3 },
-    { type: 'none' },
-];
-
-const ACTIVITY_FEED_PLACEHOLDER = [
-    { text: 'You sent a friend request to nika99', time: '2h' },
-    { text: 'You rated Wuthering Heights ★★★', time: '1d' },
-    { text: 'You liked Normal People', time: '2d' },
-    { text: 'You added Notting Hill to your watchlist', time: '4d' },
-    { text: 'mariami accepted your friend request', time: '6d' },
-];
 
 // No "favorite movies/actors" feature exists on the backend yet, so this
 // tab is entirely fixed placeholder shapes/counts until that data exists.
@@ -53,8 +38,6 @@ const NETWORK_POSTER_COUNT = 4;
 const NETWORK_SUGGESTION_STATS = { eye: 1240, grid: 18, heart: 326 };
 
 const AVATAR_COLORS = ['#00b4a2', '#e85d75', '#f2b134', '#5b8def', '#9b59b6', '#2ecc71'];
-
-
 
 function colorForName(name) {
     if (!name) return AVATAR_COLORS[0];
@@ -232,12 +215,13 @@ export default function ProfilePage() {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('profile');
     const [likesSubTab, setLikesSubTab] = useState('Films');
+    const [activities, setActivities] = useState([]);
 
     const [friends, setFriends] = useState([]);
     const [pending, setPending] = useState([]);
     const [sent, setSent] = useState([]);
     const [suggestions, setSuggestions] = useState([]);
-    const [recommendations, setRecommendations] = useState([]); // 👈 ეს ხაზი წინა ნაბიჯზე გამოგვრჩა და აუცილებელია!
+    const [recommendations, setRecommendations] = useState([]);
     const [requestsTab, setRequestsTab] = useState('pending');
     const [addUsername, setAddUsername] = useState('');
     const [panelMessage, setPanelMessage] = useState('');
@@ -262,8 +246,8 @@ export default function ProfilePage() {
     };
 
     const decodedToken = parseJwt(token);
-    const currentUsername = decodedToken?.sub;      // ვინ არის ავტორიზებული
-    const username = routeUsername || currentUsername; // ვისი პროფილი იხსნება
+    const currentUsername = decodedToken?.sub;          // who is logged in
+    const username = routeUsername || currentUsername;  // whose profile is open
     const isOwnProfile = !routeUsername || routeUsername === currentUsername;
     const authHeaders = { Authorization: `Bearer ${token}` };
 
@@ -280,27 +264,34 @@ export default function ProfilePage() {
             fetch(`https://localhost:8443/api/tracking/diary?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
         ];
 
-        // პირადი მონაცემი (მხოლოდ საკუთარ პროფილზე): requests, suggestions, recommendations
+        // Private data (own profile only)
         const privateCalls = isOwnProfile ? [
             fetch(`${FRIENDS_BASE_URL}/pending?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`${FRIENDS_BASE_URL}/sent?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`${FRIENDS_BASE_URL}/suggestions?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`https://localhost:8443/api/tracking/recommendations?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+            fetch(`https://localhost:8443/api/tracking/activity?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : []))
         ] : [];
 
         Promise.all([...publicCalls, ...privateCalls])
-            .then(([friendsList, watchlistIds, diaryList, pendingList, sentList, suggestionsList, recsList]) => {
-                setFriends(friendsList || []);
-                setFriendsCount((friendsList || []).length);
-                setWatchlistShowIds(watchlistIds || []);
-                (watchlistIds || []).forEach(ensureWatchlistShowInfo);
-                setDiaryEntries(diaryList || []);
-                (diaryList || []).forEach(e => ensureWatchlistShowInfo(e.showId));
-                setPending(pendingList || []);
-                setSent(sentList || []);
-                setSuggestions(suggestionsList || []);
-                setRecommendations(recsList || []);
-            })
+    .then(([friendsList, watchlistIds, diaryList, pendingList = [], sentlist = [], suggestionslist = [], recsList = [], activityList = []]) => {
+        
+        setFriends(friendsList || []);
+        setFriendsCount((friendsList || []).length);
+        setWatchlistShowIds(watchlistIds || []);
+        (watchlistIds || []).forEach(ensureWatchlistShowInfo);
+
+        setDiaryEntries(diaryList || []);
+        (diaryList || []).forEach(e => ensureWatchlistShowInfo(e.showId));
+
+        if (isOwnProfile) {
+            setPending(pendingList || []);
+            setSent(sentlist || []);
+            setSuggestions(suggestionslist || []);
+            setRecommendations(recsList || []);
+            setActivities((activityList || []).sort((a, b) => b.id - a.id));
+        }
+    })
             .catch(err => console.error("Error loading profile data:", err))
             .finally(() => setLoading(false));
     };
@@ -507,116 +498,241 @@ export default function ProfilePage() {
                                     Don&apos;t forget to select your <strong>favorite films</strong>!
                                 </p>
                             </section>
-                            {/* ================= 👇 ჩაამატე ეს ახალი სექცია ზუსტად აქ 👇 ================= */}
+
                             {isOwnProfile && (
-                            <section className="pp-block">
-                                <div className="pp-block-header">
-                                    <span className="pp-block-title">Recommended by Friends</span>
-                                </div>
-                                {recommendations.length === 0 ? (
-                                    <p className="pp-favorite-empty">No recommendations from friends yet.</p>
-                                ) : (
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px', marginTop: '12px' }}>
-                                        {recommendations.map(rec => (
-                                            <div
-                                                key={rec.id}
-                                                onClick={() => navigate(`/shows/${rec.showId}`)}
-                                                style={{
-                                                    background: 'rgba(255, 255, 255, 0.03)',
-                                                    border: '1px solid rgba(0, 255, 213, 0.1)',
-                                                    borderRadius: '8px',
-                                                    padding: '12px',
-                                                    cursor: 'pointer',
-                                                    transition: 'all 0.2s ease-in-out'
-                                                }}
-                                                onMouseEnter={(e) => {
-                                                    e.currentTarget.style.borderColor = '#00ffd5';
-                                                    e.currentTarget.style.background = 'rgba(0, 255, 213, 0.03)';
-                                                }}
-                                                onMouseLeave={(e) => {
-                                                    e.currentTarget.style.borderColor = 'rgba(0, 255, 213, 0.1)';
-                                                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
-                                                }}
-                                            >
-                        <span style={{ fontSize: '11px', color: '#8b949e', display: 'block', marginBottom: '4px' }}>
-                            From: <strong style={{ color: '#fff' }}>{rec.senderUsername}</strong>
-                        </span>
-                                                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', color: '#00ffd5', fontWeight: '500' }}>
-                                                    {rec.showName}
-                                                </h4>
-                                                {rec.comment && (
-                                                    <div
-                                                        style={{
-                                                            maxHeight: '54px', // 🟢 ფიქსირებული მაქსიმალური სიმაღლე (დაახლოებით 3 ხაზი)
-                                                            overflowY: 'auto', // 🟢 თუ ტექსტი დიდია, ჩნდება შიდა სქროლი
-                                                            margin: '4px 0 0 0',
-                                                            paddingLeft: '6px',
-                                                            borderLeft: '2px solid rgba(0, 255, 213, 0.4)',
-                                                        }}
-                                                        // პატარა ჰაკი, რომ სქროლი ვიზუალურად ძალიან თხელი და უჩინარი იყოს
-                                                        className="rec-comment-scroll"
-                                                    >
-                                                        <p
-                                                            style={{
-                                                                margin: '0',
-                                                                fontSize: '11px',
-                                                                color: '#c9d1d9',
-                                                                fontStyle: 'italic',
-                                                                wordBreak: 'break-word',
-                                                                overflowWrap: 'break-word',
-                                                                lineHeight: '18px'
-                                                            }}
-                                                        >
-                                                            "{rec.comment}"
-                                                        </p>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))}
+                                <section className="pp-block">
+                                    <div className="pp-block-header">
+                                        <span className="pp-block-title">Recommended by Friends</span>
                                     </div>
-                                )}
-                            </section>
+                                    {recommendations.length === 0 ? (
+                                        <p className="pp-favorite-empty">No recommendations from friends yet.</p>
+                                    ) : (
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px', marginTop: '12px' }}>
+                                            {recommendations.map(rec => (
+                                                <div
+                                                    key={rec.id}
+                                                    onClick={() => navigate(`/shows/${rec.showId}`)}
+                                                    style={{
+                                                        background: 'rgba(255, 255, 255, 0.03)',
+                                                        border: '1px solid rgba(0, 255, 213, 0.1)',
+                                                        borderRadius: '8px',
+                                                        padding: '12px',
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.2s ease-in-out'
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        e.currentTarget.style.borderColor = '#00ffd5';
+                                                        e.currentTarget.style.background = 'rgba(0, 255, 213, 0.03)';
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        e.currentTarget.style.borderColor = 'rgba(0, 255, 213, 0.1)';
+                                                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                                                    }}
+                                                >
+                                                <span style={{ fontSize: '11px', color: '#8b949e', display: 'block', marginBottom: '4px' }}>
+                                                    From: <strong style={{ color: '#fff' }}>{rec.senderUsername}</strong>
+                                                </span>
+                                                    <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', color: '#00ffd5', fontWeight: '500' }}>
+                                                        {rec.showName}
+                                                    </h4>
+                                                    {rec.comment && (
+                                                        <div
+                                                            style={{
+                                                                maxHeight: '54px',
+                                                                overflowY: 'auto',
+                                                                margin: '4px 0 0 0',
+                                                                paddingLeft: '6px',
+                                                                borderLeft: '2px solid rgba(0, 255, 213, 0.4)',
+                                                            }}
+                                                            className="rec-comment-scroll"
+                                                        >
+                                                            <p
+                                                                style={{
+                                                                    margin: '0',
+                                                                    fontSize: '11px',
+                                                                    color: '#c9d1d9',
+                                                                    fontStyle: 'italic',
+                                                                    wordBreak: 'break-word',
+                                                                    overflowWrap: 'break-word',
+                                                                    lineHeight: '18px'
+                                                                }}
+                                                            >
+                                                                "{rec.comment}"
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </section>
                             )}
+
                             <section className="pp-block">
                                 <div className="pp-block-header">
                                     <span className="pp-block-title">Recent Activity</span>
-                                    <span className="pp-block-all">All</span>
+                                    <span className="pp-block-all" onClick={() => setActiveTab('diary')} style={{ cursor: 'pointer' }}>All</span>
                                 </div>
                                 <div className="pp-activity-grid">
-                                    {RECENT_ACTIVITY_GRID.map((item, i) => (
-                                        <div key={i} className="pp-activity-poster">
-                                            <div className="pp-poster-placeholder-lg" />
-                                            {item.type === 'like' && (
-                                                <span className="pp-poster-indicator pp-poster-like"><HeartIcon /></span>
-                                            )}
-                                            {item.type === 'rating' && (
-                                                <span className="pp-poster-indicator pp-poster-stars">
-                                                    {'★'.repeat(item.stars)}
-                                                </span>
-                                            )}
-                                        </div>
-                                    ))}
+                                    {(() => {
+                                        if (!activities || activities.length === 0) {
+                                            return <p className="pp-favorite-empty" style={{ gridColumn: '1/-1' }}>No recent activity.</p>;
+                                        }
+
+                                        const mergedMap = new Map();
+
+                                        activities.forEach((act) => {
+                                            const id = act.showId;
+                                            const detailText = act.detail || "";
+                                            const currentAction = act.actionType || "";
+
+                                            if (!mergedMap.has(id)) {
+                                                const isStatusAction = ['WATCHING', 'COMPLETED', 'DROPPED', 'PLAN_TO_WATCH'].includes(currentAction);
+
+                                                mergedMap.set(id, {
+                                                    id: act.id,
+                                                    showId: id,
+                                                    showName: act.showName,
+                                                    posterPath: act.posterPath,
+                                                    rating: act.rating || (detailText.includes("Rated") ? parseInt(detailText.match(/Rated (\d)/)?.[1] || 0, 10) : 0),
+                                                    isLiked: currentAction === 'LIKED' || detailText.toLowerCase().includes('favorite') || detailText.includes('❤️'),
+                                                    status: isStatusAction ? currentAction : ""
+                                                });
+                                            }
+
+                                            const currentObj = mergedMap.get(id);
+
+                                            if (!currentObj.posterPath && act.posterPath) {
+                                                currentObj.posterPath = act.posterPath;
+                                            }
+
+                                            if (currentAction === 'LIKED' || detailText.toLowerCase().includes('favorite') || detailText.includes('❤️')) {
+                                                currentObj.isLiked = true;
+                                            }
+
+                                            if (act.rating && !currentObj.rating) {
+                                                currentObj.rating = act.rating;
+                                            } else if (detailText.includes("Rated") && !currentObj.rating) {
+                                                currentObj.rating = parseInt(detailText.match(/Rated (\d)/)?.[1] || 0, 10);
+                                            }
+
+                                            let incomingStatus = "";
+                                            if (currentAction === 'COMPLETED' || detailText.includes('COMPLETED') || detailText.includes('Completed')) {
+                                                incomingStatus = "COMPLETED";
+                                            } else if (currentAction === 'WATCHING' || detailText.includes('WATCHING') || detailText.includes('Watching')) {
+                                                incomingStatus = "WATCHING";
+                                            } else if (currentAction === 'DROPPED' || detailText.includes('DROPPED') || detailText.includes('Dropped')) {
+                                                incomingStatus = "DROPPED";
+                                            } else if (currentAction === 'PLAN_TO_WATCH' || detailText.includes('PLAN_TO_WATCH') || detailText.includes('Plan')) {
+                                                incomingStatus = "PLAN_TO_WATCH";
+                                            }
+
+                                            if (incomingStatus) {
+                                                if (!currentObj.status) {
+                                                    currentObj.status = incomingStatus;
+                                                }
+                                            }
+                                        });
+
+                                        const uniqueActivities = Array.from(mergedMap.values()).slice(0, 4);
+
+                                        return uniqueActivities.map((act) => {
+                                            const posterUrl = act.posterPath
+                                                ? `https://image.tmdb.org/t/p/w300${act.posterPath}`
+                                                : null;
+
+                                            let statusLabel = "";
+                                            let statusClass = "";
+
+                                            if (act.status === 'COMPLETED') {
+                                                statusLabel = "✔ Watched";
+                                                statusClass = "status-completed";
+                                            } else if (act.status === 'WATCHING') {
+                                                statusLabel = "👁 Watching";
+                                                statusClass = "status-watching";
+                                            } else if (act.status === 'DROPPED') {
+                                                statusLabel = "✕ Dropped";
+                                                statusClass = "status-dropped";
+                                            } else if (act.status === 'PLAN_TO_WATCH') {
+                                                statusLabel = "⏳ Plan";
+                                                statusClass = "status-plan";
+                                            }
+
+                                            return (
+                                                <div key={act.id} className="pp-activity-poster" onClick={() => navigate(`/shows/${act.showId}`)}>
+                                                    <div className="pp-poster-placeholder-lg">
+                                                        {posterUrl ? (
+                                                            <img src={posterUrl} alt={act.showName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                        ) : (
+                                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px', textAlign: 'center', fontSize: '11px', color: '#9aabbc', fontWeight: 'bold', height: '100%' }}>
+                                                                {act.showName}
+                                                            </div>
+                                                        )}
+
+                                                        <div className="pp-poster-title-hover">
+                                                            {act.showName}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="pp-poster-footer-info" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', marginTop: '10px', width: '100%' }}>
+                                                        {statusLabel && (
+                                                            <div className="status-row" style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+                                                                <span className={`pp-status-badge ${statusClass}`}>
+                                                                    {statusLabel}
+                                                                </span>
+                                                            </div>
+                                                        )}
+
+                                                        {(act.isLiked || act.rating > 0) && (
+                                                            <div className="meta-row" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%', minHeight: '20px' }}>
+                                                                {act.rating > 0 && (
+                                                                    <span className="pp-poster-stars" style={{ color: '#ffb400', letterSpacing: '1px' }}>
+                                                                        {'★'.repeat(Math.round(act.rating))}
+                                                                    </span>
+                                                                )}
+
+                                                                {act.isLiked && (
+                                                                    <span className="pp-poster-like" style={{ display: 'inline-flex', alignItems: 'center' }}>❤️</span>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        });
+                                    })()}
                                 </div>
                             </section>
                         </div>
 
                         {isOwnProfile && (
-                        <div className="pp-body-right">
-                            <section className="pp-block">
-                                <div className="pp-block-header">
-                                    <span className="pp-block-title">Activity</span>
-                                </div>
-                                <div className="pp-activity-feed">
-                                    {ACTIVITY_FEED_PLACEHOLDER.map((a, i) => (
-                                        <div key={i} className="pp-activity-row">
-                                            <span className="pp-activity-dot" />
-                                            <span className="pp-activity-text">{a.text}</span>
-                                            <span className="pp-activity-time">{a.time}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </section>
-                        </div>
+                            <div className="pp-body-right">
+                                <section className="pp-block">
+                                    <div className="pp-block-header">
+                                        <span className="pp-block-title">Activity</span>
+                                    </div>
+                                    <div className="pp-activity-feed">
+                                        {activities.length === 0 ? (
+                                            <p className="pp-favorite-empty">No logged interactions yet.</p>
+                                        ) : (
+                                            activities.slice(0, 15).map((act) => {
+                                                const dateObj = new Date(act.createdAt);
+                                                const timeLabel = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+                                                return (
+                                                    <div key={act.id} className="pp-activity-row" onClick={() => navigate(`/shows/${act.showId}`)} style={{ cursor: 'pointer' }}>
+                                                        <span className="pp-activity-dot" style={{ backgroundColor: act.actionType === 'LIKED' ? '#ff3a44' : '#00ffd5' }} />
+                                                        <span className="pp-activity-text">
+                                                        You <strong>{act.actionType.toLowerCase().replace('_', ' ')}</strong> <span style={{ color: '#00ffd5' }}>{act.showName}</span> ({act.detail})
+                                                    </span>
+                                                        <span className="pp-activity-time">{timeLabel}</span>
+                                                    </div>
+                                                );
+                                            })
+                                        )}
+                                    </div>
+                                </section>
+                            </div>
                         )}
                     </div>
                 ) : activeTab === 'favorites' ? (
@@ -862,99 +978,99 @@ export default function ProfilePage() {
                             </section>
 
                             {isOwnProfile && (
-                            <section className="pp-block pp-requests-col">
-                                <div className="pp-kicker">Requests</div>
-                                <div className="pp-requests-tabs">
-                                    <button
-                                        type="button"
-                                        className={`pp-tab-btn ${requestsTab === 'pending' ? 'pp-tab-btn-active' : ''}`}
-                                        onClick={() => setRequestsTab('pending')}
+                                <section className="pp-block pp-requests-col">
+                                    <div className="pp-kicker">Requests</div>
+                                    <div className="pp-requests-tabs">
+                                        <button
+                                            type="button"
+                                            className={`pp-tab-btn ${requestsTab === 'pending' ? 'pp-tab-btn-active' : ''}`}
+                                            onClick={() => setRequestsTab('pending')}
+                                        >
+                                            Pending ({pending.length})
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={`pp-tab-btn ${requestsTab === 'sent' ? 'pp-tab-btn-active' : ''}`}
+                                            onClick={() => setRequestsTab('sent')}
+                                        >
+                                            Sent ({sent.length})
+                                        </button>
+                                    </div>
+
+                                    <form
+                                        className="pp-add-form"
+                                        onSubmit={(e) => { e.preventDefault(); handleSendRequest(); }}
                                     >
-                                        Pending ({pending.length})
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className={`pp-tab-btn ${requestsTab === 'sent' ? 'pp-tab-btn-active' : ''}`}
-                                        onClick={() => setRequestsTab('sent')}
-                                    >
-                                        Sent ({sent.length})
-                                    </button>
-                                </div>
+                                        <input
+                                            className="pp-add-input"
+                                            placeholder="Add by username"
+                                            value={addUsername}
+                                            onChange={(e) => setAddUsername(e.target.value)}
+                                        />
+                                        <button type="submit" className="pp-add-btn">Send</button>
+                                    </form>
 
-                                <form
-                                    className="pp-add-form"
-                                    onSubmit={(e) => { e.preventDefault(); handleSendRequest(); }}
-                                >
-                                    <input
-                                        className="pp-add-input"
-                                        placeholder="Add by username"
-                                        value={addUsername}
-                                        onChange={(e) => setAddUsername(e.target.value)}
-                                    />
-                                    <button type="submit" className="pp-add-btn">Send</button>
-                                </form>
+                                    {panelMessage && <div className="pp-panel-message">{panelMessage}</div>}
 
-                                {panelMessage && <div className="pp-panel-message">{panelMessage}</div>}
-
-                                <div className="pp-requests-list">
-                                    {requestsTab === 'pending' ? (
-                                        pending.length === 0 ? (
-                                            <div className="pp-panel-empty">No incoming requests.</div>
-                                        ) : (
-                                            pending.map((req) => (
-                                                <div key={req.id} className="pp-panel-row">
-                                                    <Avatar name={req.requesterUsername} size={28} />
-                                                    <span className="pp-panel-row-name">{req.requesterUsername}</span>
-                                                    <div className="pp-panel-row-actions">
-                                                        <button className="pp-mini-btn pp-mini-accept" onClick={() => handleAccept(req.id)}>Accept</button>
-                                                        <button className="pp-mini-btn pp-mini-decline" onClick={() => handleDecline(req.id)}>Decline</button>
+                                    <div className="pp-requests-list">
+                                        {requestsTab === 'pending' ? (
+                                            pending.length === 0 ? (
+                                                <div className="pp-panel-empty">No incoming requests.</div>
+                                            ) : (
+                                                pending.map((req) => (
+                                                    <div key={req.id} className="pp-panel-row">
+                                                        <Avatar name={req.requesterUsername} size={28} />
+                                                        <span className="pp-panel-row-name">{req.requesterUsername}</span>
+                                                        <div className="pp-panel-row-actions">
+                                                            <button className="pp-mini-btn pp-mini-accept" onClick={() => handleAccept(req.id)}>Accept</button>
+                                                            <button className="pp-mini-btn pp-mini-decline" onClick={() => handleDecline(req.id)}>Decline</button>
+                                                        </div>
                                                     </div>
+                                                ))
+                                            )
+                                        ) : sent.length === 0 ? (
+                                            <div className="pp-panel-empty">No sent requests.</div>
+                                        ) : (
+                                            sent.map((req) => (
+                                                <div key={req.id} className="pp-panel-row">
+                                                    <Avatar name={req.recipientUsername} size={28} />
+                                                    <span className="pp-panel-row-name">{req.recipientUsername}</span>
+                                                    <span className="pp-pill">awaiting</span>
                                                 </div>
                                             ))
-                                        )
-                                    ) : sent.length === 0 ? (
-                                        <div className="pp-panel-empty">No sent requests.</div>
-                                    ) : (
-                                        sent.map((req) => (
-                                            <div key={req.id} className="pp-panel-row">
-                                                <Avatar name={req.recipientUsername} size={28} />
-                                                <span className="pp-panel-row-name">{req.recipientUsername}</span>
-                                                <span className="pp-pill">awaiting</span>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                            </section>
+                                        )}
+                                    </div>
+                                </section>
                             )}
                         </div>
 
                         {isOwnProfile && (
-                        <section className="pp-block">
-                            <div className="pp-kicker">People you may know</div>
-                            {suggestions.length === 0 ? (
-                                <div className="pp-section-empty">No suggestions right now.</div>
-                            ) : (
-                                <div className="pp-suggestions-list">
-                                    {suggestions.map((s) => (
-                                        <div key={s.username} className="pp-suggestion-row">
-                                            <Avatar name={s.username} size={44} />
-                                            <div className="pp-suggestion-info">
-                                                <span className="pp-suggestion-name">{s.username}</span>
-                                                <span className="pp-suggestion-sub">
+                            <section className="pp-block">
+                                <div className="pp-kicker">People you may know</div>
+                                {suggestions.length === 0 ? (
+                                    <div className="pp-section-empty">No suggestions right now.</div>
+                                ) : (
+                                    <div className="pp-suggestions-list">
+                                        {suggestions.map((s) => (
+                                            <div key={s.username} className="pp-suggestion-row">
+                                                <Avatar name={s.username} size={44} />
+                                                <div className="pp-suggestion-info">
+                                                    <span className="pp-suggestion-name">{s.username}</span>
+                                                    <span className="pp-suggestion-sub">
                                                     {s.mutualFriendCount} mutual friend{s.mutualFriendCount === 1 ? '' : 's'}
                                                 </span>
+                                                </div>
+                                                <div className="pp-suggestion-stats">
+                                                    <span className="pp-stat"><EyeIcon /> {NETWORK_SUGGESTION_STATS.eye}</span>
+                                                    <span className="pp-stat"><GridIcon /> {NETWORK_SUGGESTION_STATS.grid}</span>
+                                                    <span className="pp-stat"><HeartIcon /> {NETWORK_SUGGESTION_STATS.heart}</span>
+                                                </div>
+                                                <button className="pp-add-circle-btn" onClick={() => handleSendRequest(s.username)}>+</button>
                                             </div>
-                                            <div className="pp-suggestion-stats">
-                                                <span className="pp-stat"><EyeIcon /> {NETWORK_SUGGESTION_STATS.eye}</span>
-                                                <span className="pp-stat"><GridIcon /> {NETWORK_SUGGESTION_STATS.grid}</span>
-                                                <span className="pp-stat"><HeartIcon /> {NETWORK_SUGGESTION_STATS.heart}</span>
-                                            </div>
-                                            <button className="pp-add-circle-btn" onClick={() => handleSendRequest(s.username)}>+</button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </section>
+                                        ))}
+                                    </div>
+                                )}
+                            </section>
                         )}
                     </div>
                 )}
