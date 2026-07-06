@@ -20,4 +20,9 @@ public interface UserShowStatusRepository extends JpaRepository<UserShowStatus, 
 
     // Diary: ამ იუზერის ყველა დათარიღებული whole-show ჩანაწერი
     List<UserShowStatus> findByUserIdAndWatchDateIsNotNull(Long userId);
+
+    // Likes: ამ იუზერის მოწონებული (heart / isFavorite=true) შოუები, ბოლო-პირველი
+    @org.springframework.data.jpa.repository.Query(
+            "SELECT s FROM UserShowStatus s WHERE s.userId = :userId AND s.isFavorite = true ORDER BY s.id DESC")
+    List<UserShowStatus> findLikedByUserId(@org.springframework.data.repository.query.Param("userId") Long userId);
 }
