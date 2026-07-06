@@ -579,11 +579,18 @@
 
 .pp-diary-row {
     display: grid;
-    grid-template-columns: 60px 32px minmax(0, 1fr) 80px 110px 44px 70px 60px 56px;
+    /* Date | Film (flexible) | Released | [Rating Like Rewatch Review Edit] — equal, right cluster */
+    grid-template-columns: 110px minmax(0, 1fr) 76px 88px 88px 88px 88px 52px;
     align-items: center;
     gap: 12px;
     padding: 10px 6px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.pp-diary-col-date {
+    color: #7c93a8;
+    font-size: 0.82rem;
+    white-space: nowrap;
 }
 
 .pp-diary-row-head {
@@ -593,6 +600,15 @@
     text-transform: uppercase;
     letter-spacing: 0.5px;
     padding-bottom: 10px;
+}
+
+/* Uniform header labels — override the per-column data-cell font sizes/colors */
+.pp-diary-row-head span {
+    color: #5f758a;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .pp-diary-col-released, .pp-diary-col-day {
@@ -635,7 +651,8 @@
 .pp-diary-film-title {
     color: #ffffff;
     font-weight: 700;
-    font-size: 0.9rem;
+    font-size: 0.82rem;
+    letter-spacing: 0.5px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -663,12 +680,161 @@
     color: #f2b134;
 }
 
+/* Review cell — actual review text, truncated with ellipsis */
+.pp-diary-col-review {
+    color: #9aabbc;
+    font-size: 0.82rem;
+    font-style: italic;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+/* Custom filter dropdown (keeps the original plain-span look, but functional) */
+.pp-diary-dd {
+    position: relative;
+    display: inline-flex;
+}
+
+.pp-diary-dd-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 50;
+    margin-top: 8px;
+    min-width: 130px;
+    max-height: 260px;
+    overflow-y: auto;
+    background: #1b2530;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    padding: 4px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+}
+
+.pp-diary-dd-item {
+    padding: 7px 10px;
+    border-radius: 5px;
+    color: #c9d1d9;
+    font-size: 0.8rem;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.pp-diary-dd-item:hover {
+    background: rgba(0, 180, 162, 0.14);
+}
+
+.pp-diary-dd-item-active {
+    color: #00b4a2;
+    font-weight: 700;
+}
+
 .pp-diary-col-edit {
     display: flex;
     align-items: center;
     gap: 8px;
     color: #5f758a;
     font-size: 0.85rem;
+}
+
+/* ── Diary edit modal ── */
+.pp-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.65);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.pp-modal {
+    width: 100%;
+    max-width: 460px;
+    background: #141b24;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.pp-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+}
+
+.pp-modal-title {
+    margin: 0;
+    color: #fff;
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+
+.pp-modal-close {
+    background: none;
+    border: none;
+    color: #8b9bb0;
+    font-size: 1.1rem;
+    cursor: pointer;
+}
+
+.pp-modal-stars {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+}
+
+.pp-modal-textarea {
+    width: 100%;
+    min-height: 90px;
+    resize: vertical;
+    background: #0f151c;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    color: #e6edf3;
+    padding: 10px;
+    font-size: 0.9rem;
+    box-sizing: border-box;
+    margin-bottom: 12px;
+}
+
+.pp-modal-toggles {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 16px;
+}
+
+.pp-modal-check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #c9d1d9;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.pp-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.pp-modal-save {
+    background: #00b4a2;
+    border: none;
+    border-radius: 8px;
+    color: #04231f;
+    font-weight: 700;
+    padding: 9px 22px;
+    cursor: pointer;
+}
+
+.pp-modal-save:disabled {
+    opacity: 0.6;
+    cursor: default;
 }
 
 .pp-diary-edit-icon {
@@ -1144,10 +1310,10 @@
     }
 
     .pp-diary-row {
-        grid-template-columns: 50px 28px minmax(160px, 1fr) 70px 90px 36px 0 0 0;
+        grid-template-columns: 84px minmax(90px, 1fr) 56px 72px 56px 0 72px 40px;
     }
 
-    .pp-diary-col-rewatch, .pp-diary-col-review {
+    .pp-diary-col-rewatch {
         display: none;
     }
 

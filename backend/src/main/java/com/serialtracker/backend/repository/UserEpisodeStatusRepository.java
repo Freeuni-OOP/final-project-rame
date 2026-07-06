@@ -16,4 +16,7 @@ public interface UserEpisodeStatusRepository extends JpaRepository<UserEpisodeSt
     void deleteByUserIdAndShowId(Long userId, int showId);
 
     List<UserEpisodeStatus> findByShowIdAndReviewIsNotNull(int showId);
+
+    // Diary: ამ იუზერის ყველა დათარიღებული ეპიზოდ-ჩანაწერი
+    List<UserEpisodeStatus> findByUserIdAndWatchDateIsNotNull(Long userId);
 }
