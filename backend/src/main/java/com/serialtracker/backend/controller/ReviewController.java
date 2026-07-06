@@ -28,4 +28,15 @@ public class ReviewController {
 
         return reviewService.getReviewsForShow(showId, username, season, episode);
     }
+
+    // POST /api/reviews/like?username=Niakoo&reviewType=EPISODE&reviewId=5
+    // ლაიქის toggle — აბრუნებს { liked, likeCount }
+    @PostMapping("/like")
+    public java.util.Map<String, Object> toggleLike(
+            @RequestParam String username,
+            @RequestParam String reviewType,
+            @RequestParam Long reviewId) {
+
+        return reviewService.toggleLike(username, reviewType, reviewId);
+    }
 }

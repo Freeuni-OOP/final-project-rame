@@ -19,6 +19,12 @@ public class DiaryEntryResponse {
     private String review;
     private boolean wholeShow;
 
+    // Review-likes
+    private Long reviewId;       // წყაროს row id (episode ან show სტატუსში)
+    private String reviewType;   // "EPISODE" | "SHOW"
+    private long likeCount;
+    private boolean likedByMe;   // მიმდინარე მნახველმა დაალაიქა თუ არა
+
     public DiaryEntryResponse() {}
 
     public int getShowId() { return showId; }
@@ -47,4 +53,16 @@ public class DiaryEntryResponse {
 
     public boolean isWholeShow() { return wholeShow; }
     public void setWholeShow(boolean wholeShow) { this.wholeShow = wholeShow; }
+
+    public Long getReviewId() { return reviewId; }
+    public void setReviewId(Long reviewId) { this.reviewId = reviewId; }
+
+    public String getReviewType() { return reviewType; }
+    public void setReviewType(String reviewType) { this.reviewType = reviewType; }
+
+    public long getLikeCount() { return likeCount; }
+    public void setLikeCount(long likeCount) { this.likeCount = likeCount; }
+
+    public boolean isLikedByMe() { return likedByMe; }
+    public void setLikedByMe(boolean likedByMe) { this.likedByMe = likedByMe; }
 }

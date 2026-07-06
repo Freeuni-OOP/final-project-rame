@@ -5,7 +5,9 @@ import com.serialtracker.backend.entity.Friendship;
 import com.serialtracker.backend.entity.User;
 import com.serialtracker.backend.entity.UserEpisodeStatus;
 import com.serialtracker.backend.entity.UserShowStatus;
+import com.serialtracker.backend.entity.ReviewLike;
 import com.serialtracker.backend.repository.FriendshipRepository;
+import com.serialtracker.backend.repository.ReviewLikeRepository;
 import com.serialtracker.backend.repository.UserEpisodeStatusRepository;
 import com.serialtracker.backend.repository.UserRepository;
 import com.serialtracker.backend.repository.UserShowStatusRepository;
@@ -21,19 +23,51 @@ import java.util.Set;
 @Service
 public class ReviewService {
 
+    public static final String TYPE_EPISODE = "EPISODE";
+    public static final String TYPE_SHOW = "SHOW";
+
     private final UserRepository userRepository;
     private final UserShowStatusRepository showStatusRepository;
     private final UserEpisodeStatusRepository episodeStatusRepository;
     private final FriendshipRepository friendshipRepository;
+    private final ReviewLikeRepository reviewLikeRepository;
 
     public ReviewService(UserRepository userRepository,
                          UserShowStatusRepository showStatusRepository,
                          UserEpisodeStatusRepository episodeStatusRepository,
-                         FriendshipRepository friendshipRepository) {
+                         FriendshipRepository friendshipRepository,
+                         ReviewLikeRepository reviewLikeRepository) {
         this.userRepository = userRepository;
         this.showStatusRepository = showStatusRepository;
         this.episodeStatusRepository = episodeStatusRepository;
         this.friendshipRepository = friendshipRepository;
+        this.reviewLikeRepository = reviewLikeRepository;
+    }
+
+    /**
+     * რევიუს ლაიქის ჩართვა/გამორთვა (toggle).
+     * @return [liked, likeCount] — ახალი მდგომარეობა.
+     */
+    public Map<String, Object> toggleLike(String username, String reviewType, Long reviewId) {
+        Long likerId = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found: " + username))
+                .getId();
+
+        boolean liked;
+        var existing = reviewLikeRepository
+                .findByLikerUserIdAndReviewTypeAndReviewId(likerId, reviewType, reviewId);
+        if (existing.isPresent()) {
+            reviewLikeRepository.delete(existing.get());
+            liked = false;
+        } else {
+            reviewLikeRepository.save(new ReviewLike(likerId, reviewType, reviewId));
+            liked = true;
+        }
+
+        Map<String, Object> res = new HashMap<>();
+        res.put("liked", liked);
+        res.put("likeCount", reviewLikeRepository.countByReviewTypeAndReviewId(reviewType, reviewId));
+        return res;
     }
 
     /**
@@ -60,6 +94,16 @@ public class ReviewService {
             });
         }
 
+        // 1b) მიმდინარე მნახველის ლაიქები (TYPE:id კომპლექტად, სწრაფი lookup-ისთვის)
+        Set<String> myLikedKeys = new HashSet<>();
+        if (currentUsername != null) {
+            userRepository.findByUsername(currentUsername).ifPresent(me -> {
+                for (ReviewLike rl : reviewLikeRepository.findByLikerUserId(me.getId())) {
+                    myLikedKeys.add(rl.getReviewType() + ":" + rl.getReviewId());
+                }
+            });
+        }
+
         // 2) userId → username რუკა (რომ ყოველ რივიუზე ცალკე მოთხოვნა არ გავუშვათ)
         Map<Long, String> usernameCache = new HashMap<>();
 
@@ -81,6 +125,7 @@ public class ReviewService {
             r.setSeasonNumber(ep.getSeasonNumber());
             r.setEpisodeNumber(ep.getEpisodeNumber());
             r.setFriend(friendIds.contains(ep.getUserId()));
+            applyLikes(r, TYPE_EPISODE, ep.getId(), myLikedKeys);
             result.add(r);
         }
 
@@ -96,10 +141,19 @@ public class ReviewService {
             r.setSeasonNumber(null);
             r.setEpisodeNumber(null);
             r.setFriend(friendIds.contains(show.getUserId()));
+            applyLikes(r, TYPE_SHOW, show.getId(), myLikedKeys);
             result.add(r);
         }
 
         return result;
+    }
+
+    // რევიუზე ლაიქების რაოდენობა + reviewId/type + მნახველმა დაალაიქა თუ არა
+    private void applyLikes(ReviewResponse r, String type, Long reviewId, Set<String> myLikedKeys) {
+        r.setReviewId(reviewId);
+        r.setReviewType(type);
+        r.setLikeCount(reviewLikeRepository.countByReviewTypeAndReviewId(type, reviewId));
+        r.setLikedByMe(myLikedKeys.contains(type + ":" + reviewId));
     }
 
     // სპოილერ-ფილტრი: ჩანს თუ ეს რივიუ არჩეული სეზონი/ეპიზოდის ჩათვლით ან უკან არის
