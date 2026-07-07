@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { PlusCircle, Bell } from 'lucide-react';
+import { PlusCircle, Bell, LogOut } from 'lucide-react'; // 🟢 შემოვიტანეთ LogOut აიქონი
 import LogModal from './LogModal';
 import '../style/Header.css';
 
@@ -30,6 +30,13 @@ export default function Header() {
     const decodedToken = parseJwt(token);
     const username = decodedToken?.sub;
 
+    // 🟢 ახალი ფუნქცია: მომხმარებლის სისტემიდან გამოსვლა
+    const handleLogout = () => {
+        localStorage.clear(); // ვშლით ტოკენებს ქეშიდან
+        sessionStorage.clear();
+        navigate('/login'); // გადაგვყავს ლოგინის გვერდზე
+    };
+
     const fetchUnreadCount = () => {
         if (!username || !token) return;
         fetch(`https://localhost:8443/api/tracking/recommendations/unread-count?username=${username}`, {
@@ -47,7 +54,6 @@ export default function Header() {
         })
             .then(res => res.ok ? res.json() : [])
             .then(data => {
-                // ზარში ვტოვებთ მხოლოდ წაუკითხავ (false) ნოტიფიკაციებს
                 const unreadOnly = data.filter(rec => !rec.read && !rec.isRead);
                 setRecommendations(unreadOnly);
             })
@@ -70,7 +76,6 @@ export default function Header() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // 🟢 სუფთა კლიკი ზარზე - არაფერს არ ნიშნავს მასიურად წაკითხულად
     const handleBellClick = () => {
         if (!isBellOpen) {
             fetchRecommendations();
@@ -80,7 +85,6 @@ export default function Header() {
         }
     };
 
-    // 🟢 ახალი ფუნქცია: მხოლოდ კონკრეტული ნოტიფიკაციის წაკითხვა ID-ით
     const handleNotificationClick = (rec) => {
         setIsBellOpen(false);
 
@@ -90,15 +94,12 @@ export default function Header() {
         })
             .then(res => {
                 if (res.ok) {
-                    // მომენტალურად ვაქრობთ სიიდან ვიზუალურად
                     setRecommendations(prev => prev.filter(item => item.id !== rec.id));
-                    // ვაკლებთ ბეიჯის ციფრს
                     setUnreadCount(prev => Math.max(0, prev - 1));
                 }
             })
             .catch(err => console.error("Error marking recommendation read:", err));
 
-        // გადავყავართ სერიალზე
         navigate(`/shows/${rec.showId}`);
     };
 
@@ -139,7 +140,7 @@ export default function Header() {
                     </form>
                 </div>
 
-                <div className="header-right">
+                <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                     {username ? (
                         <>
                             <div className="header-bell-container" ref={bellRef} style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -162,33 +163,33 @@ export default function Header() {
                                                 <div style={{ padding: '15px', textAlign: 'center', color: '#8b949e', fontSize: '12px' }}>No new recommendations</div>
                                             ) : (
                                                 recommendations.slice(0, 5).map((rec) => (
-                                                        <div
-                                                            key={rec.id}
-                                                            onClick={() => handleNotificationClick(rec)}
-                                                            style={{
-                                                                padding: '10px 14px',
-                                                                borderBottom: '1px solid rgba(255,255,255,0.02)',
-                                                                cursor: 'pointer',
-                                                                display: 'flex',
-                                                                flexDirection: 'column',
-                                                                gap: '2px',
-                                                                transition: 'background 0.2s'
-                                                            }}
-                                                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
-                                                            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                                                        >
-                                                            <span style={{ fontSize: '12px', color: '#c9d1d9' }}>
-                                                                <strong>{rec.senderUsername}</strong> recommended:
+                                                    <div
+                                                        key={rec.id}
+                                                        onClick={() => handleNotificationClick(rec)}
+                                                        style={{
+                                                            padding: '10px 14px',
+                                                            borderBottom: '1px solid rgba(255,255,255,0.02)',
+                                                            cursor: 'pointer',
+                                                            display: 'flex',
+                                                            flexDirection: 'column',
+                                                            gap: '2px',
+                                                            transition: 'background 0.2s'
+                                                        }}
+                                                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
+                                                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                                    >
+                                                        <span style={{ fontSize: '12px', color: '#c9d1d9' }}>
+                                                            <strong>{rec.senderUsername}</strong> recommended:
+                                                        </span>
+                                                        <span style={{ fontSize: '12px', color: '#00ffd5', fontWeight: '500' }}>
+                                                            {rec.showName}
+                                                        </span>
+                                                        {rec.comment && (
+                                                            <span style={{ fontSize: '11px', color: '#8b949e', fontStyle: 'italic' }}>
+                                                                "{rec.comment}"
                                                             </span>
-                                                            <span style={{ fontSize: '12px', color: '#00ffd5', fontWeight: '500' }}>
-                                                                {rec.showName}
-                                                            </span>
-                                                            {rec.comment && (
-                                                                <span style={{ fontSize: '11px', color: '#8b949e', fontStyle: 'italic' }}>
-                                                                    "{rec.comment}"
-                                                                </span>
                                                         )}
-                                                        </div>
+                                                    </div>
                                                 ))
                                             )}
                                         </div>
@@ -207,6 +208,36 @@ export default function Header() {
                                     {username.charAt(0).toUpperCase()}
                                 </div>
                             </div>
+
+                            {/* 🟢 ახალი ლოგაუტის ღილაკი პროფილის გვერდით */}
+                            <button
+                                onClick={handleLogout}
+                                className="header-logout-btn"
+                                title="Log Out"
+                                style={{
+                                    background: 'none',
+                                    border: '1px solid rgba(255, 77, 77, 0.3)',
+                                    color: '#ff4d4d',
+                                    padding: '6px 10px',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    transition: 'all 0.2s ease',
+                                    height: '32px'
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.backgroundColor = 'rgba(255, 77, 77, 0.1)';
+                                    e.currentTarget.style.borderColor = '#ff4d4d';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.backgroundColor = 'transparent';
+                                    e.currentTarget.style.borderColor = 'rgba(255, 77, 77, 0.3)';
+                                }}
+                            >
+                                <LogOut size={16} />
+                            </button>
                         </>
                     ) : (
                         <div className="header-profile-wrapper" onClick={() => navigate('/login')}>
