@@ -28,12 +28,8 @@ const LISTS_BASE_URL = 'https://localhost:8443/api/lists';
 const SHOWS_BASE_URL = 'https://localhost:8443/api/shows';
 const POSTER_BASE = 'https://image.tmdb.org/t/p/w300';
 
-const RECENTLY_LIKED = [
-    { title: "2000's", creator: 'gabi', films: 31, likes: 480, comments: 2, desc: "iconic 2000's girly films" },
-    { title: 'favorites', creator: 'lisraa', films: 30, likes: 4 },
-    { title: 'Giant Insects & Naked Ladies!', creator: 'Funktual', films: 26, likes: 1 },
-    { title: "2000's chick flicks", creator: 'paden19', films: 150, likes: '2.5K', comments: 7, desc: "literally every 2000's chick flick you can think of and ones you don't even know about" },
-];
+// RECENTLY_LIKED is now loaded from the real backend (GET /api/lists/liked).
+// The placeholder array was removed.
 
 export const CREW_PICKS = [
     {
@@ -167,11 +163,9 @@ function MyListCard({ list, posterPaths, itemCount, onOpen }) {
     );
 }
 
-// Real-data version of ListCard, used for "Featured Lists" once we're
-// pulling actual public lists from the backend instead of placeholder
-// content. Shows who made it and how many shows are in it; no likes/
-// comments since that system doesn't exist yet.
-function FeaturedListCard({ list, posterPaths, itemCount, onOpen }) {
+// Real-data version of ListCard, used for "Featured Lists" and "Popular This Week".
+// Shows who made it, how many shows are in it, and a ♥ like button on hover.
+function FeaturedListCard({ list, posterPaths, itemCount, onOpen, liked, likeCount, onLike, showLike }) {
     return (
         <div className="lp-card" onClick={() => onOpen(list.id)}>
             <RealPosterStrip posterPaths={posterPaths} size="lg" />
@@ -184,6 +178,16 @@ function FeaturedListCard({ list, posterPaths, itemCount, onOpen }) {
             </div>
             <div className="lp-card-stats">
                 <span className="lp-stat">{itemCount} {itemCount === 1 ? 'show' : 'shows'}</span>
+                {showLike && (
+                    <button
+                        type="button"
+                        className={`lp-card-like-btn${liked ? ' lp-card-like-btn-active' : ''}`}
+                        onClick={onLike}
+                        title={liked ? 'Unlike this list' : 'Like this list'}
+                    >
+                        ♥{likeCount > 0 ? ` ${likeCount}` : ''}
+                    </button>
+                )}
             </div>
         </div>
     );
@@ -203,6 +207,10 @@ export default function ListsPage() {
 
     const [popularLists, setPopularLists] = useState([]);
     const [popularLoading, setPopularLoading] = useState(true);
+
+    const [recentlyLiked, setRecentlyLiked] = useState([]);
+    // local overrides for like counts after optimistic toggles
+    const [likeCountOverride, setLikeCountOverride] = useState({});
 
     // showId -> { name, poster_path }, filled in lazily as we discover which
     // shows are in which lists (the list/item backend only stores TMDB ids,
@@ -351,6 +359,21 @@ export default function ListsPage() {
         loadPopularLists();
     }, [loadPopularLists]);
 
+    // Recently Liked — lists the current user has liked, newest-liked-first.
+    // Only fetches when logged in (no username = no liked lists to show).
+    useEffect(() => {
+        if (!username) return;
+        fetch(`${LISTS_BASE_URL}/liked?username=${username}`, { headers: authHeaders })
+            .then(r => (r.ok ? r.json() : []))
+            .then(data => {
+                const rl = data || [];
+                setRecentlyLiked(rl);
+                rl.forEach(l => loadItemsFor(l.id));
+            })
+            .catch(() => setRecentlyLiked([]));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [username]);
+
     const handleCreateList = () => {
         if (!username) return;
         if (!newListName.trim()) {
@@ -376,6 +399,41 @@ export default function ListsPage() {
                 navigate(`/lists/${created.id}/edit`);
             })
             .catch((msg) => setFormError(typeof msg === 'string' ? msg : 'Could not create list.'));
+    };
+
+    // Set of list IDs the current user has liked (derived from recentlyLiked)
+    const likedSet = new Set(recentlyLiked.map(l => l.id));
+
+    const handleCardLike = (list, e) => {
+        e.stopPropagation();
+        if (!username) return;
+
+        const currentlyLiked = likedSet.has(list.id);
+        const currentCount = likeCountOverride[list.id] !== undefined
+            ? likeCountOverride[list.id]
+            : (list.likeCount || 0);
+
+        if (currentlyLiked) {
+            setRecentlyLiked(prev => prev.filter(l => l.id !== list.id));
+            setLikeCountOverride(prev => ({ ...prev, [list.id]: Math.max(0, currentCount - 1) }));
+            fetch(`${LISTS_BASE_URL}/${list.id}/like?username=${username}`, {
+                method: 'POST', headers: authHeaders,
+            }).catch(() => {
+                setRecentlyLiked(prev => [list, ...prev]);
+                setLikeCountOverride(prev => ({ ...prev, [list.id]: currentCount }));
+            });
+        } else {
+            const enriched = { ...list, likeCount: currentCount + 1, likedByMe: true };
+            setRecentlyLiked(prev => [enriched, ...prev]);
+            setLikeCountOverride(prev => ({ ...prev, [list.id]: currentCount + 1 }));
+            if (!itemsByListId[list.id]) loadItemsFor(list.id);
+            fetch(`${LISTS_BASE_URL}/${list.id}/like?username=${username}`, {
+                method: 'POST', headers: authHeaders,
+            }).catch(() => {
+                setRecentlyLiked(prev => prev.filter(l => l.id !== list.id));
+                setLikeCountOverride(prev => ({ ...prev, [list.id]: currentCount }));
+            });
+        }
     };
 
     return (
@@ -484,6 +542,10 @@ export default function ListsPage() {
                                         posterPaths={posterPaths}
                                         itemCount={items.length}
                                         onOpen={(id) => navigate(`/lists/${id}`)}
+                                        liked={likedSet.has(list.id)}
+                                        likeCount={likeCountOverride[list.id] ?? list.likeCount ?? 0}
+                                        onLike={(e) => handleCardLike(list, e)}
+                                        showLike={!!username}
                                     />
                                 );
                             })}
@@ -518,6 +580,10 @@ export default function ListsPage() {
                                         posterPaths={posterPaths}
                                         itemCount={items.length}
                                         onOpen={(id) => navigate(`/lists/${id}`)}
+                                        liked={likedSet.has(list.id)}
+                                        likeCount={likeCountOverride[list.id] ?? list.likeCount ?? 0}
+                                        onLike={(e) => handleCardLike(list, e)}
+                                        showLike={!!username}
                                     />
                                 );
                             })}
@@ -531,22 +597,46 @@ export default function ListsPage() {
                             <span className="lp-kicker">Recently Liked</span>
                         </div>
                         <div className="lp-liked-list">
-                            {RECENTLY_LIKED.map((item, i) => (
-                                <div key={i} className="lp-liked-row">
-                                    <PosterStrip size="sm" />
-                                    <div className="lp-liked-content">
-                                        <div className="lp-liked-title">{item.title}</div>
-                                        <div className="lp-liked-meta">
-                                            <MiniAvatar name={item.creator} size={18} />
-                                            <span className="lp-creator-name">{item.creator}</span>
-                                            <span className="lp-stat">{item.films} films</span>
-                                            {item.likes !== undefined && <span className="lp-stat"><HeartIcon /> {item.likes}</span>}
-                                            {item.comments !== undefined && <span className="lp-stat"><CommentIcon /> {item.comments}</span>}
+                            {recentlyLiked.length === 0 ? (
+                                <p className="lp-empty-note">
+                                    {username ? 'No liked lists yet — like a list to see it here.' : 'Log in to see your liked lists.'}
+                                </p>
+                            ) : recentlyLiked.map((item) => {
+                                const posterItems = (itemsByListId[item.id] || []).slice(0, 5);
+                                const rowLikeCount = likeCountOverride[item.id] ?? item.likeCount ?? 0;
+                                return (
+                                    <div
+                                        key={item.id}
+                                        className="lp-liked-row"
+                                        style={{ cursor: 'pointer' }}
+                                        onClick={() => navigate(`/lists/${item.id}`)}
+                                    >
+                                        <RealPosterStrip
+                                            posterPaths={posterItems.map(pi => showInfoCache[pi.showId]?.poster_path).filter(Boolean)}
+                                            size="sm"
+                                        />
+                                        <div className="lp-liked-content">
+                                            <div className="lp-liked-title">{item.name}</div>
+                                            <div className="lp-liked-meta">
+                                                <MiniAvatar name={item.ownerUsername} size={18} />
+                                                <span className="lp-creator-name">{item.ownerUsername}</span>
+                                                <span className="lp-stat">{(itemsByListId[item.id] || []).length} films</span>
+                                                {username && (
+                                                    <button
+                                                        type="button"
+                                                        className={`lp-row-like-btn${likedSet.has(item.id) ? ' lp-row-like-btn-active' : ''}`}
+                                                        onClick={(e) => handleCardLike(item, e)}
+                                                        title={likedSet.has(item.id) ? 'Unlike this list' : 'Like this list'}
+                                                    >
+                                                        ♥{rowLikeCount > 0 ? ` ${rowLikeCount}` : ''}
+                                                    </button>
+                                                )}
+                                            </div>
+                                            {item.description && <p className="lp-liked-desc">{item.description}</p>}
                                         </div>
-                                        {item.desc && <p className="lp-liked-desc">{item.desc}</p>}
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </section>
 

@@ -2,9 +2,11 @@ package com.serialtracker.backend.controller;
 
 import com.serialtracker.backend.entity.MovieList;
 import com.serialtracker.backend.entity.MovieListItem;
+import com.serialtracker.backend.entity.MovieListLike;
 import com.serialtracker.backend.entity.User;
 import com.serialtracker.backend.dto.MovieListDto;
 import com.serialtracker.backend.dto.MovieListItemDto;
+import com.serialtracker.backend.repository.MovieListLikeRepository;
 import com.serialtracker.backend.repository.UserRepository;
 import com.serialtracker.backend.service.MovieListService;
 import org.springframework.http.ResponseEntity;
@@ -22,10 +24,14 @@ public class MovieListController {
 
     private final MovieListService movieListService;
     private final UserRepository userRepository;
+    private final MovieListLikeRepository likeRepository;
 
-    public MovieListController(MovieListService movieListService, UserRepository userRepository) {
+    public MovieListController(MovieListService movieListService,
+                                UserRepository userRepository,
+                                MovieListLikeRepository likeRepository) {
         this.movieListService = movieListService;
         this.userRepository = userRepository;
+        this.likeRepository = likeRepository;
     }
 
     @PostMapping
@@ -158,7 +164,8 @@ public class MovieListController {
     }
 
     @GetMapping("/{listId}")
-    public ResponseEntity<?> getList(@PathVariable Long listId) {
+    public ResponseEntity<?> getList(@PathVariable Long listId,
+                                      @RequestParam(required = false) String username) {
         try {
             MovieList list = movieListService.getList(listId);
             String ownerUsername = usernameOf(list.getOwnerId());
@@ -167,10 +174,57 @@ public class MovieListController {
                     .map(MovieListItemDto::from)
                     .toList();
 
-            return ResponseEntity.ok(MovieListDto.from(list, ownerUsername, items));
+            long likeCount = likeRepository.countByListId(listId);
+            boolean likedByMe = false;
+            if (username != null && !username.isBlank()) {
+                likedByMe = userRepository.findByUsername(username)
+                        .map(u -> likeRepository.findByLikerUserIdAndListId(u.getId(), listId).isPresent())
+                        .orElse(false);
+            }
+
+            return ResponseEntity.ok(MovieListDto.from(list, ownerUsername, likeCount, likedByMe, items));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
+    }
+
+    // Toggle like on a list. Returns true if now liked, false if unliked.
+    @PostMapping("/{listId}/like")
+    public ResponseEntity<?> toggleLike(@PathVariable Long listId,
+                                         @RequestParam String username) {
+        Long userId = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"))
+                .getId();
+
+        var existing = likeRepository.findByLikerUserIdAndListId(userId, listId);
+        if (existing.isPresent()) {
+            likeRepository.delete(existing.get());
+            return ResponseEntity.ok(false);
+        } else {
+            likeRepository.save(new MovieListLike(userId, listId));
+            return ResponseEntity.ok(true);
+        }
+    }
+
+    // Lists recently liked by this user, newest-liked-first.
+    @GetMapping("/liked")
+    public ResponseEntity<?> getRecentlyLiked(@RequestParam String username) {
+        Long userId = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"))
+                .getId();
+
+        List<MovieListDto> liked = likeRepository
+                .findByLikerUserIdOrderByLikedAtDesc(userId)
+                .stream()
+                .map(like -> {
+                    MovieList list = movieListService.getList(like.getListId());
+                    String ownerUsername = usernameOf(list.getOwnerId());
+                    long likeCount = likeRepository.countByListId(list.getId());
+                    return MovieListDto.from(list, ownerUsername, likeCount, true);
+                })
+                .toList();
+
+        return ResponseEntity.ok(liked);
     }
 
     private String usernameOf(Long userId) {
