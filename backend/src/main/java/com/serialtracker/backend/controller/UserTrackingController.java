@@ -200,7 +200,28 @@ public class UserTrackingController {
         return ResponseEntity.ok(showIds);
     }
 
-    // Films count: ბოლომდე ნანახი (COMPLETED) შოუების რაოდენობა — პროფილის "Films" სტატისტიკა
+// Likes: ამ იუზერის მოწონებული (heart) შოუები – showId + rating (Likes tab-ის ფილტრებისთვის),
+    // ბოლო-პირველი (findLikedByUserId უკვე id DESC-ით აბრუნებს)
+    @GetMapping("/likes")
+    public ResponseEntity<?> getLikes(@RequestParam String username) {
+        Long userId = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"))
+                .getId();
+
+        List<java.util.Map<String, Object>> liked = statusRepository.findLikedByUserId(userId)
+                .stream()
+                .map(s -> {
+                    java.util.Map<String, Object> m = new java.util.HashMap<>();
+                    m.put("showId", s.getShowId());
+                    m.put("rating", s.getRating()); // შეიძლება null იყოს
+                    return m;
+                })
+                .toList();
+
+        return ResponseEntity.ok(liked);
+    }
+
+    // Films count: ბოლომდე ნანახი (COMPLETED) შოუების რაოდენობა – პროფილის "Films" სტატისტიკა
     @GetMapping("/films-count")
     public ResponseEntity<?> getFilmsCount(@RequestParam String username) {
         Long userId = userRepository.findByUsername(username)
@@ -210,7 +231,6 @@ public class UserTrackingController {
         long count = statusRepository.countByUserIdAndStatus(userId, SeriesStatus.COMPLETED);
         return ResponseEntity.ok(count);
     }
-
     // Diary: ამ იუზერის ყველა დათარიღებული ჩანაწერი (ეპიზოდები + whole-show),
     // watchDate-ით ახლიდან-ძველისკენ დალაგებული. title/poster front-end-ი TMDB-დან იღებს.
     @GetMapping("/diary")
