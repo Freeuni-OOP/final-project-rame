@@ -11,6 +11,12 @@ public class ReviewResponse {
     private Integer episodeNumber;  // null თუ Whole Show რივიუა
     private boolean friend;         // true თუ ეს მიმდინარე იუზერის მეგობარია
 
+    // Review-likes
+    private Long reviewId;           // წყაროს row id (episode ან show სტატუსში)
+    private String reviewType;       // "EPISODE" | "SHOW"
+    private long likeCount;          // რამდენმა დაალაიქა
+    private boolean likedByMe;       // მიმდინარე მნახველმა დაალაიქა თუ არა
+
     public ReviewResponse() {}
 
     public String getUsername() { return username; }
@@ -36,4 +42,16 @@ public class ReviewResponse {
 
     public boolean isFriend() { return friend; }
     public void setFriend(boolean friend) { this.friend = friend; }
+
+    public Long getReviewId() { return reviewId; }
+    public void setReviewId(Long reviewId) { this.reviewId = reviewId; }
+
+    public String getReviewType() { return reviewType; }
+    public void setReviewType(String reviewType) { this.reviewType = reviewType; }
+
+    public long getLikeCount() { return likeCount; }
+    public void setLikeCount(long likeCount) { this.likeCount = likeCount; }
+
+    public boolean isLikedByMe() { return likedByMe; }
+    public void setLikedByMe(boolean likedByMe) { this.likedByMe = likedByMe; }
 }

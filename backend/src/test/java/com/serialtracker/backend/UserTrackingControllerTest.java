@@ -26,6 +26,7 @@ class UserTrackingControllerTest {
     private UserRepository userRepository;
     private RecommendationRepository recommendationRepository;
     private com.serialtracker.backend.repository.ActivityRepository activityRepository;
+    private com.serialtracker.backend.repository.ReviewLikeRepository reviewLikeRepository;
     // უშუალოდ გასატესტი კონტროლერი
     private UserTrackingController userTrackingController;
 
@@ -37,9 +38,10 @@ class UserTrackingControllerTest {
         userRepository = mock(UserRepository.class);
         recommendationRepository = mock(RecommendationRepository.class);
         activityRepository = mock(com.serialtracker.backend.repository.ActivityRepository.class);
+        reviewLikeRepository = mock(com.serialtracker.backend.repository.ReviewLikeRepository.class);
         // 3. კონტროლერის ინიციალიზაცია ჩვეულებრივი კონსტრუქტორით
         userTrackingController = new UserTrackingController(
-                statusRepository, episodeRepository, userRepository, recommendationRepository, activityRepository
+                statusRepository, episodeRepository, userRepository, recommendationRepository, activityRepository, reviewLikeRepository
         );
     }
 

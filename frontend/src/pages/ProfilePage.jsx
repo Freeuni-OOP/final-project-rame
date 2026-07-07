@@ -263,7 +263,7 @@ export default function ProfilePage() {
         const publicCalls = [
             fetch(`${FRIENDS_BASE_URL}?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`https://localhost:8443/api/tracking/watchlist?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-            fetch(`https://localhost:8443/api/tracking/diary?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+            fetch(`https://localhost:8443/api/tracking/diary?username=${username}&viewer=${currentUsername || ''}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`https://localhost:8443/api/tracking/likes?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`https://localhost:8443/api/tracking/films-count?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : 0)),
         ];
@@ -418,6 +418,24 @@ export default function ProfilePage() {
             return (b.watchDate || '').localeCompare(a.watchDate || ''); // date-desc (default)
         });
 
+    // სხვისი diary-ჩანაწერის (რევიუს) ლაიქის toggle
+    const handleDiaryReviewLike = (entry) => {
+        if (!currentUsername || !entry.reviewId) return;
+        fetch(`https://localhost:8443/api/reviews/like?username=${currentUsername}&reviewType=${entry.reviewType}&reviewId=${entry.reviewId}`, {
+            method: 'POST',
+            headers: authHeaders,
+        })
+            .then(r => (r.ok ? r.json() : null))
+            .then(data => {
+                if (!data) return;
+                setDiaryEntries(prev => prev.map(e =>
+                    (e.reviewId === entry.reviewId && e.reviewType === entry.reviewType)
+                        ? { ...e, likeCount: data.likeCount, likedByMe: data.liked }
+                        : e
+                ));
+            })
+            .catch(err => console.error("Diary review like failed:", err));
+    };
     // ── Likes: მოწონებულ შოუებს ვამდიდრებთ TMDB info-თი, ვფილტრავთ და ვასორტირებთ ──
     const likesDisplay = likedShows.map((it, idx) => {
         const info = watchlistInfo[it.showId] || {};
@@ -841,7 +859,7 @@ export default function ProfilePage() {
                                     <span className="pp-diary-col-like">Like</span>
                                     <span className="pp-diary-col-rewatch">Rewatch</span>
                                     <span className="pp-diary-col-review">Review</span>
-                                    <span className="pp-diary-col-edit">Edit</span>
+                                    <span className="pp-diary-col-edit">{isOwnProfile ? 'Edit' : 'Like'}</span>
                                 </div>
 
                                 {visibleDiary.map((entry, i) => {
@@ -889,7 +907,7 @@ export default function ProfilePage() {
                                                 {entry.review || ''}
                                             </span>
                                             <span className="pp-diary-col-edit">
-                                                {isOwnProfile && (
+                                                {isOwnProfile ? (
                                                     <span
                                                         className="pp-diary-edit-icon"
                                                         style={{ cursor: 'pointer' }}
@@ -897,6 +915,20 @@ export default function ProfilePage() {
                                                         onClick={() => setEditingEntry(entry)}
                                                     >
                                                         ✎
+                                                    </span>
+                                                ) : (
+                                                    <span
+                                                        className="pp-diary-like-cell"
+                                                        title={entry.likedByMe ? 'Unlike' : 'Like this review'}
+                                                    >
+                                                        <span
+                                                            className="pp-diary-like-heart"
+                                                            style={{ cursor: 'pointer', color: entry.likedByMe ? '#e85d75' : '#5f758a' }}
+                                                            onClick={() => handleDiaryReviewLike(entry)}
+                                                        >
+                                                            {entry.likedByMe ? '♥' : '♡'}
+                                                        </span>
+                                                        <span className="pp-diary-like-count">{entry.likeCount || 0}</span>
                                                     </span>
                                                 )}
                                             </span>
