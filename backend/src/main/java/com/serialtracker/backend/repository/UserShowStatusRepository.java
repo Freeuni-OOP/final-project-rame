@@ -25,4 +25,6 @@ public interface UserShowStatusRepository extends JpaRepository<UserShowStatus, 
     @org.springframework.data.jpa.repository.Query(
             "SELECT s FROM UserShowStatus s WHERE s.userId = :userId AND s.isFavorite = true ORDER BY s.id DESC")
     List<UserShowStatus> findLikedByUserId(@org.springframework.data.repository.query.Param("userId") Long userId);
+    // Films count: ბოლომდე ნანახი (COMPLETED) შოუების რაოდენობა
+    long countByUserIdAndStatus(Long userId, SeriesStatus status);
 }
