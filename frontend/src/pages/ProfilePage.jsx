@@ -264,7 +264,6 @@ export default function ProfilePage() {
             fetch(`${FRIENDS_BASE_URL}?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`https://localhost:8443/api/tracking/watchlist?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`https://localhost:8443/api/tracking/diary?username=${username}&viewer=${currentUsername || ''}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-            fetch(`https://localhost:8443/api/tracking/diary?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`https://localhost:8443/api/tracking/likes?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`https://localhost:8443/api/tracking/films-count?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : 0)),
         ];
