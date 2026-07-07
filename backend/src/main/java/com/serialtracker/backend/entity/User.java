@@ -20,6 +20,10 @@ public class User {
     @Column(nullable = false)
     private String password;
 
+    @Lob
+    @jakarta.persistence.Column(name = "profile_picture", columnDefinition = "LONGBLOB")
+    private byte[] profilePicture;
+
     public User() {}
 
     public User(String username, String email, String password) {
@@ -37,4 +41,6 @@ public class User {
     public void setEmail(String email){this.email =email;}
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }
+    public byte[] getProfilePicture() { return profilePicture; }
+    public void setProfilePicture(byte[] profilePicture) { this.profilePicture = profilePicture; }
 }
