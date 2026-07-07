@@ -21,7 +21,7 @@ const FAVORITE_ACTORS_COUNT = 6;
 // genuinely empty (no fabricated rows) — just the filter chrome plus an
 // empty state, matching the real "no data yet" situation.
 const LIKES_FILTERS = ['Rating', 'Decade', 'Genre', 'Service', 'Sort by When Liked'];
-const LIKES_SUBTABS = ['Films', 'Reviews', 'Lists'];
+const LIKES_SUBTABS = ['TV Shows', 'Reviews', 'Lists'];
 
 // Watchlist is backed by the real "PLAN_TO_WATCH" show status (set from the
 // star icon on a show/details page). Backend already returns it newest-added
@@ -197,7 +197,7 @@ export default function ProfilePage() {
     const [friendsCount, setFriendsCount] = useState(0);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('profile');
-    const [likesSubTab, setLikesSubTab] = useState('Films');
+    const [likesSubTab, setLikesSubTab] = useState('TV Shows');
     const [activities, setActivities] = useState([]);
 
     const [friends, setFriends] = useState([]);
@@ -251,18 +251,20 @@ export default function ProfilePage() {
             currentUsername
                 ? fetch(`${FRIENDS_BASE_URL}/suggestions?actingUsername=${currentUsername}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : []))
                 : Promise.resolve([]),
+            // Recent activity — ამ პროფილის მფლობელის (username), არა შემხედველის.
+            // ამიტომ public-ია: სხვის გვერდზეც მისი აქტივობა უნდა ჩანდეს, არა ჩემი.
+            fetch(`https://localhost:8443/api/tracking/activity?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
         ];
 
-        // Private data (own profile only) — მოთხოვნები/რეკომენდაციები/აქტივობა მხოლოდ საკუთარია
+        // Private data (own profile only) — მოთხოვნები/რეკომენდაციები მხოლოდ საკუთარია
         const privateCalls = isOwnProfile ? [
             fetch(`${FRIENDS_BASE_URL}/pending?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`${FRIENDS_BASE_URL}/sent?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`https://localhost:8443/api/tracking/recommendations?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-            fetch(`https://localhost:8443/api/tracking/activity?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : []))
         ] : [];
 
         Promise.all([...publicCalls, ...privateCalls])
-    .then(([friendsList, watchlistIds, diaryList, suggestionslist = [], pendingList = [], sentlist = [], recsList = [], activityList = []]) => {
+    .then(([friendsList, watchlistIds, diaryList, suggestionslist = [], activityList = [], pendingList = [], sentlist = [], recsList = []]) => {
 
         setFriends(friendsList || []);
         setFriendsCount((friendsList || []).length);
@@ -273,12 +275,17 @@ export default function ProfilePage() {
         (diaryList || []).forEach(e => ensureWatchlistShowInfo(e.showId));
 
         setSuggestions(suggestionslist || []);
+        setActivities((activityList || []).sort((a, b) => b.id - a.id));
 
         if (isOwnProfile) {
             setPending(pendingList || []);
             setSent(sentlist || []);
             setRecommendations(recsList || []);
-            setActivities((activityList || []).sort((a, b) => b.id - a.id));
+        } else {
+            // სხვის პროფილზე პირადი მონაცემი არ ჩანს — ძველი (ჩემი) გავასუფთაოთ
+            setPending([]);
+            setSent([]);
+            setRecommendations([]);
         }
     })
             .catch(err => console.error("Error loading profile data:", err))
@@ -343,10 +350,19 @@ export default function ProfilePage() {
             .catch(err => console.error('Error removing from watchlist:', err));
     };
 
-    // ახალ პროფილზე გადასვლისას (network-დან სხვისი პროფილის გახსნისას) ყოველთვის
-    // "Profile" ტაბით დავიწყოთ — წინა გვერდის აქტიური ტაბი (მაგ. Network) არ დარჩეს.
+    // ახალ პროფილზე გადასვლისას (network-დან სხვისი პროფილის გახსნისას):
+    // 1) ყოველთვის "Profile" ტაბით დავიწყოთ; 2) ძველი პროფილის მონაცემი გავასუფთაოთ,
+    // რომ ახალის ჩატვირთვამდე წამით არ გამოჩნდეს.
     useEffect(() => {
         setActiveTab('profile');
+        setActivities([]);
+        setFriends([]);
+        setFriendsCount(0);
+        setWatchlistShowIds([]);
+        setDiaryEntries([]);
+        setPending([]);
+        setSent([]);
+        setRecommendations([]);
     }, [routeUsername]);
 
     useEffect(() => {
@@ -457,7 +473,7 @@ export default function ProfilePage() {
                     <div className="pp-stats">
                         <div className="pp-stat-item">
                             <span className="pp-stat-num">{PLACEHOLDER_FILMS_COUNT}</span>
-                            <span className="pp-stat-label">Films</span>
+                            <span className="pp-stat-label">TV Shows</span>
                         </div>
                         <div className="pp-stat-item">
                             <span className="pp-stat-num">{loading ? '–' : friendsCount}</span>
@@ -510,10 +526,10 @@ export default function ProfilePage() {
                         <div className="pp-body-left">
                             <section className="pp-block">
                                 <div className="pp-block-header">
-                                    <span className="pp-block-title">Favorite Films</span>
+                                    <span className="pp-block-title">Favorite TV Shows</span>
                                 </div>
                                 <p className="pp-favorite-empty">
-                                    Don&apos;t forget to select your <strong>favorite films</strong>!
+                                    Don&apos;t forget to select your <strong>favorite TV shows</strong>!
                                 </p>
                             </section>
 
@@ -817,7 +833,7 @@ export default function ProfilePage() {
                             <div className="pp-diary-table">
                                 <div className="pp-diary-row pp-diary-row-head">
                                     <span className="pp-diary-col-date">Date</span>
-                                    <span className="pp-diary-col-film">Film</span>
+                                    <span className="pp-diary-col-film">Show</span>
                                     <span className="pp-diary-col-released">Released</span>
                                     <span className="pp-diary-col-rating">Rating</span>
                                     <span className="pp-diary-col-like">Like</span>
@@ -921,11 +937,11 @@ export default function ProfilePage() {
                     </div>
                 ) : activeTab === 'watchlist' ? (
                     <div className="pp-watchlist-solo">
-                        <div className="pp-watchlist-title">You want to see {watchlistShowIds.length} film{watchlistShowIds.length === 1 ? '' : 's'}</div>
+                        <div className="pp-watchlist-title">You want to see {watchlistShowIds.length} TV show{watchlistShowIds.length === 1 ? '' : 's'}</div>
 
                         {watchlistShowIds.length === 0 ? (
                             <div className="pp-likes-empty-box">
-                                <p className="pp-likes-empty-text">No films yet</p>
+                                <p className="pp-likes-empty-text">No TV shows yet</p>
                             </div>
                         ) : (
                             <div className="pp-watchlist-poster-grid">
@@ -990,7 +1006,7 @@ export default function ProfilePage() {
                                                         <Avatar name={name} size={64} />
                                                         <span className="pp-network-name">{name}</span>
                                                         <span className="pp-network-stats">
-                                                            {NETWORK_FILM_COUNT} films &bull; {NETWORK_REVIEW_COUNT} reviews
+                                                            {NETWORK_FILM_COUNT} TV shows &bull; {NETWORK_REVIEW_COUNT} reviews
                                                         </span>
                                                     </div>
                                                     <div className="pp-poster-row">

@@ -381,7 +381,7 @@ export default function ListsPage() {
     return (
         <div className="lp-page">
             <main className="lp-main">
-                <p className="lp-tagline">Collect, curate, and share. Lists are the perfect way to group films.</p>
+                <p className="lp-tagline">Collect, curate, and share. Lists are the perfect way to group TV shows.</p>
                 <div className="lp-cta-wrap">
                     <button className="lp-start-btn" onClick={() => setShowCreateForm(v => !v)}>
                         Start your own list
@@ -539,7 +539,7 @@ export default function ListsPage() {
                                         <div className="lp-liked-meta">
                                             <MiniAvatar name={item.creator} size={18} />
                                             <span className="lp-creator-name">{item.creator}</span>
-                                            <span className="lp-stat">{item.films} films</span>
+                                            <span className="lp-stat">{item.films} TV shows</span>
                                             {item.likes !== undefined && <span className="lp-stat"><HeartIcon /> {item.likes}</span>}
                                             {item.comments !== undefined && <span className="lp-stat"><CommentIcon /> {item.comments}</span>}
                                         </div>
@@ -571,7 +571,7 @@ export default function ListsPage() {
                                             <div className="lp-crew-pick-meta">
                                                 <MiniAvatar name={item.creator} size={18} />
                                                 <span className="lp-creator-name">{item.creator}</span>
-                                                {item.films !== undefined && <span className="lp-stat">{item.films} films</span>}
+                                                {item.films !== undefined && <span className="lp-stat">{item.films} TV shows</span>}
                                             </div>
                                         )}
                                     </div>
