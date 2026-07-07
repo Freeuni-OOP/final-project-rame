@@ -20,4 +20,7 @@ public interface UserShowStatusRepository extends JpaRepository<UserShowStatus, 
 
     // Diary: ამ იუზერის ყველა დათარიღებული whole-show ჩანაწერი
     List<UserShowStatus> findByUserIdAndWatchDateIsNotNull(Long userId);
+
+    // Films count: ბოლომდე ნანახი (COMPLETED) შოუების რაოდენობა
+    long countByUserIdAndStatus(Long userId, SeriesStatus status);
 }

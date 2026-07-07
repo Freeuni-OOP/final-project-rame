@@ -200,6 +200,17 @@ public class UserTrackingController {
         return ResponseEntity.ok(showIds);
     }
 
+    // Films count: ბოლომდე ნანახი (COMPLETED) შოუების რაოდენობა — პროფილის "Films" სტატისტიკა
+    @GetMapping("/films-count")
+    public ResponseEntity<?> getFilmsCount(@RequestParam String username) {
+        Long userId = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"))
+                .getId();
+
+        long count = statusRepository.countByUserIdAndStatus(userId, SeriesStatus.COMPLETED);
+        return ResponseEntity.ok(count);
+    }
+
     // Diary: ამ იუზერის ყველა დათარიღებული ჩანაწერი (ეპიზოდები + whole-show),
     // watchDate-ით ახლიდან-ძველისკენ დალაგებული. title/poster front-end-ი TMDB-დან იღებს.
     @GetMapping("/diary")
