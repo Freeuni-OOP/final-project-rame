@@ -167,27 +167,59 @@ function MyListCard({ list, posterPaths, itemCount, onOpen }) {
     );
 }
 
-// Real-data version of ListCard, used for "Featured Lists" once we're
-// pulling actual public lists from the backend instead of placeholder
-// content. Shows who made it and how many shows are in it; no likes/
-// comments since that system doesn't exist yet.
 function FeaturedListCard({ list, posterPaths, itemCount, onOpen }) {
+    const creator = list.ownerUsername || 'unknown';
+    const initial = creator.charAt(0).toUpperCase();
+    const hasAvatar = !!list.ownerProfilePicture;
+    const avatarSrc = hasAvatar ? `data:image/jpeg;base64,${list.ownerProfilePicture}` : null;
+
     return (
-        <div className="lp-card" onClick={() => onOpen(list.id)}>
-            <RealPosterStrip posterPaths={posterPaths} size="lg" />
+        <div className="lp-card" onClick={() => onOpen(list.id)} style={{ cursor: 'pointer' }}>
+            <RealPosterStrip posterPaths={posterPaths} size="card" />
             <div className="lp-card-title">{list.name}</div>
-            <div className="lp-card-meta">
-                <MiniAvatar name={list.ownerUsername} />
-                <span>
-                    Created by <span className="lp-creator-name">{list.ownerUsername}</span>
+            <div className="lp-card-meta" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {hasAvatar ? (
+                        /* თუ ბექენდმა სურათი გამოატანა, ვხატავთ მას */
+                        <img
+                            src={avatarSrc}
+                            alt={creator}
+                            style={{ width: '18px', height: '18px', borderRadius: '50%', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)' }}
+                        />
+                    ) : (
+                        /* თუ არადა, ჩვეულებრივი ფერადი ასო */
+                        <div
+                            className="lp-avatar"
+                            style={{
+                                width: '18px',
+                                height: '18px',
+                                backgroundColor: colorForName(creator),
+                                fontSize: '9px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: '50%',
+                                color: '#fff',
+                                fontWeight: 'bold'
+                            }}
+                        >
+                            {initial}
+                        </div>
+                    )}
+                    <span className="lp-creator-name" style={{ fontSize: '12px', color: '#cbd5e1' }}>{creator}</span>
+                </div>
+                <span className="lp-stat" style={{ fontSize: '12px', color: '#9ab3c8' }}>
+                    {itemCount} {itemCount === 1 ? 'show' : 'shows'}
                 </span>
-            </div>
-            <div className="lp-card-stats">
-                <span className="lp-stat">{itemCount} {itemCount === 1 ? 'show' : 'shows'}</span>
             </div>
         </div>
     );
 }
+
+// Real-data version of ListCard, used for "Featured Lists" once we're
+// pulling actual public lists from the backend instead of placeholder
+// content. Shows who made it and how many shows are in it; no likes/
+// comments since that system doesn't exist yet.
 
 export default function ListsPage() {
     const navigate = useNavigate();

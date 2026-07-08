@@ -11,14 +11,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/lists")
+@CrossOrigin(origins = "http://localhost:5173")
 public class MovieListController {
-
-    // TODO: same placeholder situation as FriendController — "actingUsername"
-    // should eventually come from the authenticated user (@AuthenticationPrincipal)
-    // once a JWT filter reads the Authorization header. Not secure yet, local-testing only.
 
     private final MovieListService movieListService;
     private final UserRepository userRepository;
@@ -30,12 +28,14 @@ public class MovieListController {
 
     @PostMapping
     public ResponseEntity<?> createList(@RequestParam String actingUsername,
-                                         @RequestParam String name,
-                                         @RequestParam(required = false) String description,
-                                         @RequestParam(defaultValue = "true") boolean isPublic) {
+                                        @RequestParam String name,
+                                        @RequestParam(required = false) String description,
+                                        @RequestParam(defaultValue = "true") boolean isPublic) {
         try {
             MovieList list = movieListService.createList(actingUsername, name, description, isPublic);
-            return ResponseEntity.ok(MovieListDto.from(list, actingUsername));
+            User owner = userRepository.findByUsername(actingUsername).orElse(null);
+            return owner != null ? ResponseEntity.ok(MovieListDto.from(list, owner))
+                    : ResponseEntity.ok(MovieListDto.from(list, actingUsername));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
@@ -43,12 +43,14 @@ public class MovieListController {
 
     @PutMapping("/{listId}")
     public ResponseEntity<?> renameList(@PathVariable Long listId,
-                                         @RequestParam String actingUsername,
-                                         @RequestParam String name,
-                                         @RequestParam(required = false) String description) {
+                                        @RequestParam String actingUsername,
+                                        @RequestParam String name,
+                                        @RequestParam(required = false) String description) {
         try {
             MovieList list = movieListService.renameList(listId, actingUsername, name, description);
-            return ResponseEntity.ok(MovieListDto.from(list, actingUsername));
+            User owner = userRepository.findByUsername(actingUsername).orElse(null);
+            return owner != null ? ResponseEntity.ok(MovieListDto.from(list, owner))
+                    : ResponseEntity.ok(MovieListDto.from(list, actingUsername));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
@@ -56,11 +58,13 @@ public class MovieListController {
 
     @PutMapping("/{listId}/visibility")
     public ResponseEntity<?> setVisibility(@PathVariable Long listId,
-                                            @RequestParam String actingUsername,
-                                            @RequestParam boolean isPublic) {
+                                           @RequestParam String actingUsername,
+                                           @RequestParam boolean isPublic) {
         try {
             MovieList list = movieListService.setVisibility(listId, actingUsername, isPublic);
-            return ResponseEntity.ok(MovieListDto.from(list, actingUsername));
+            User owner = userRepository.findByUsername(actingUsername).orElse(null);
+            return owner != null ? ResponseEntity.ok(MovieListDto.from(list, owner))
+                    : ResponseEntity.ok(MovieListDto.from(list, actingUsername));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
@@ -68,7 +72,7 @@ public class MovieListController {
 
     @DeleteMapping("/{listId}")
     public ResponseEntity<?> deleteList(@PathVariable Long listId,
-                                         @RequestParam String actingUsername) {
+                                        @RequestParam String actingUsername) {
         try {
             movieListService.deleteList(listId, actingUsername);
             return ResponseEntity.ok("List deleted.");
@@ -79,8 +83,8 @@ public class MovieListController {
 
     @PostMapping("/{listId}/shows")
     public ResponseEntity<?> addShow(@PathVariable Long listId,
-                                      @RequestParam String actingUsername,
-                                      @RequestParam int showId) {
+                                     @RequestParam String actingUsername,
+                                     @RequestParam int showId) {
         try {
             MovieListItem item = movieListService.addShow(listId, actingUsername, showId);
             return ResponseEntity.ok(MovieListItemDto.from(item));
@@ -91,8 +95,8 @@ public class MovieListController {
 
     @DeleteMapping("/{listId}/shows/{showId}")
     public ResponseEntity<?> removeShow(@PathVariable Long listId,
-                                         @PathVariable int showId,
-                                         @RequestParam String actingUsername) {
+                                        @PathVariable int showId,
+                                        @RequestParam String actingUsername) {
         try {
             movieListService.removeShow(listId, actingUsername, showId);
             return ResponseEntity.ok("Show removed from list.");
@@ -103,8 +107,8 @@ public class MovieListController {
 
     @PutMapping("/{listId}/order")
     public ResponseEntity<?> reorderShows(@PathVariable Long listId,
-                                           @RequestParam String actingUsername,
-                                           @RequestBody List<Integer> orderedShowIds) {
+                                          @RequestParam String actingUsername,
+                                          @RequestBody List<Integer> orderedShowIds) {
         try {
             movieListService.reorderShows(listId, actingUsername, orderedShowIds);
             return ResponseEntity.ok("List reordered.");
@@ -116,8 +120,9 @@ public class MovieListController {
     @GetMapping
     public ResponseEntity<?> getMyLists(@RequestParam String actingUsername) {
         try {
+            User owner = userRepository.findByUsername(actingUsername).orElse(null);
             List<MovieListDto> lists = movieListService.getListsOwnedBy(actingUsername).stream()
-                    .map(list -> MovieListDto.from(list, actingUsername))
+                    .map(list -> owner != null ? MovieListDto.from(list, owner) : MovieListDto.from(list, actingUsername))
                     .toList();
             return ResponseEntity.ok(lists);
         } catch (RuntimeException e) {
@@ -125,34 +130,35 @@ public class MovieListController {
         }
     }
 
-    // Newest public lists from any user, used for the Lists page's
-    // "Featured Lists" section. No actingUsername needed since this is
-    // just a public, read-only feed.
     @GetMapping("/public")
     public ResponseEntity<?> getFeaturedLists() {
         List<MovieListDto> lists = movieListService.getRecentPublicLists().stream()
-                .map(list -> MovieListDto.from(list, usernameOf(list.getOwnerId())))
+                .map(list -> {
+                    User owner = userOf(list.getOwnerId());
+                    return owner != null ? MovieListDto.from(list, owner) : MovieListDto.from(list, "unknown");
+                })
                 .toList();
         return ResponseEntity.ok(lists);
     }
 
-    // Every public list, newest first - backs the "View All" page for
-    // Featured Lists (unlike /public, which is capped to a handful).
     @GetMapping("/public/all")
     public ResponseEntity<?> getAllFeaturedLists() {
         List<MovieListDto> lists = movieListService.getAllPublicLists().stream()
-                .map(list -> MovieListDto.from(list, usernameOf(list.getOwnerId())))
+                .map(list -> {
+                    User owner = userOf(list.getOwnerId());
+                    return owner != null ? MovieListDto.from(list, owner) : MovieListDto.from(list, "unknown");
+                })
                 .toList();
         return ResponseEntity.ok(lists);
     }
 
-    // Public lists with the most shows in them, used for the Lists page's
-    // "Popular This Week" section. No real popularity tracking exists yet,
-    // so this approximates it as "biggest public lists".
     @GetMapping("/public/popular")
     public ResponseEntity<?> getPopularLists() {
         List<MovieListDto> lists = movieListService.getPopularPublicLists().stream()
-                .map(list -> MovieListDto.from(list, usernameOf(list.getOwnerId())))
+                .map(list -> {
+                    User owner = userOf(list.getOwnerId());
+                    return owner != null ? MovieListDto.from(list, owner) : MovieListDto.from(list, "unknown");
+                })
                 .toList();
         return ResponseEntity.ok(lists);
     }
@@ -161,21 +167,21 @@ public class MovieListController {
     public ResponseEntity<?> getList(@PathVariable Long listId) {
         try {
             MovieList list = movieListService.getList(listId);
-            String ownerUsername = usernameOf(list.getOwnerId());
+            User owner = userOf(list.getOwnerId());
 
             List<MovieListItemDto> items = movieListService.getItems(listId).stream()
                     .map(MovieListItemDto::from)
                     .toList();
 
-            return ResponseEntity.ok(MovieListDto.from(list, ownerUsername, items));
+            return owner != null
+                    ? ResponseEntity.ok(MovieListDto.from(list, owner, items))
+                    : ResponseEntity.ok(MovieListDto.from(list, "unknown", items));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 
-    private String usernameOf(Long userId) {
-        return userRepository.findById(userId)
-                .map(User::getUsername)
-                .orElse("unknown");
+    private User userOf(Long userId) {
+        return userRepository.findById(userId).orElse(null);
     }
 }

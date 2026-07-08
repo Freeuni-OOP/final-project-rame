@@ -294,10 +294,22 @@ export default function ProfilePage() {
                 if (data.usernameChanged) {
                     alert('Username changed successfully! Please log in again with your new username.');
                     localStorage.removeItem('token');
+                    localStorage.removeItem('userAvatar'); // ძველი ფოტოს წაშლა
                     navigate('/login');
                 } else {
-                    alert('Updated successfully!');
-                    window.location.reload();
+                    // 🟢 თუ იუზერმა აირჩია და შეცვალა ფოტო, ინახება local-შიც
+                    if (selectedFile) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                            localStorage.setItem('userAvatar', reader.result); // ინახავს Base64 სტრინგს
+                            alert('Updated successfully!');
+                            window.location.reload(); // რეფრეში, რომ ყველამ დაინახოს
+                        };
+                        reader.readAsDataURL(selectedFile);
+                    } else {
+                        alert('Updated successfully!');
+                        window.location.reload();
+                    }
                 }
             })
             .catch(err => {
