@@ -129,7 +129,7 @@ function DiaryEditModal({ entry, username, token, onClose, onSaved }) {
     const [liked, setLiked] = useState(!!entry.liked);
     const [rewatch, setRewatch] = useState(!!entry.rewatch);
     const [saving, setSaving] = useState(false);
-
+    const [activeTab, setActiveTab] = useState('menu'); // 'menu', 'picture', 'username', 'password'
 
     const epLabel = (entry.seasonNumber != null && entry.episodeNumber != null)
         ? ` S${entry.seasonNumber}E${entry.episodeNumber}` : '';
@@ -254,42 +254,55 @@ export default function ProfilePage() {
     const handleSaveChanges = (e) => {
         e.preventDefault();
 
-        // 🟢 1. ვქმნით ჰედერს სპეციალური Headers ობიექტით
+        const rawToken = localStorage.getItem('token');
+        let cleanToken = rawToken ? (JSON.parse(rawToken).token || rawToken) : '';
+
         const myHeaders = new Headers();
-        myHeaders.append("Authorization", `Bearer ${token}`);
-        // მარადაცილებით არ ჩაწერო აქ "Content-Type"! ბრაუზერმა თვითონ უნდა დასვას FormData-სთვის.
+        myHeaders.append("Authorization", `Bearer ${cleanToken}`);
 
         const formData = new FormData();
-        formData.append('currentUsername', username);
-        if (newUsername) formData.append('newUsername', newUsername);
-        if (newPassword) formData.append('password', newPassword);
-        if (selectedFile) formData.append('profilePicture', selectedFile);
+        formData.append('currentUsername', username); // მიმდინარე სახელი სულ სჭირდება ბექენდს იდენტიფიკაციისთვის
 
-        // 🟢 2. გადავცემთ შეცვლილ ჰედერს
+        // 🟢 ბექენდს ვუგზავნით მხოლოდ იმას, რაც აქტიურ ტაბშია არჩეული
+        if (activeTab === 'username' && newUsername) {
+            formData.append('newUsername', newUsername);
+        } else if (activeTab === 'password' && newPassword) {
+            formData.append('password', newPassword);
+        } else if (activeTab === 'picture' && selectedFile) {
+            formData.append('profilePicture', selectedFile);
+        } else {
+            alert("Please fill out the selected field first.");
+            return;
+        }
+
         fetch('https://localhost:8443/api/auth/profile', {
             method: 'PUT',
-            headers: myHeaders, // 👈 აქ ჩაჯდა ახალი ჰედერი
+            headers: myHeaders,
             body: formData
         })
-            .then(res => res.ok ? res.json() : Promise.reject('Update failed'))
+            .then(async res => {
+                if (!res.ok) {
+                    const txt = await res.text();
+                    throw new Error(txt || 'Update failed');
+                }
+                return res.json();
+            })
             .then(data => {
-
                 setShowEditModal(false);
+                setActiveTab('menu'); // მოდალის დახურვისას მენიუ ვამყოფოთ საწყის პოზიციაზე
 
                 if (data.usernameChanged) {
-                    // 🟢 თუ სახელი შეიცვალა, ლოგაუტი და გადასვლა ლოგინზე
                     alert('Username changed successfully! Please log in again with your new username.');
-                    localStorage.removeItem('token'); // ვშლით ძველ ტოკენს
-                    navigate('/login'); // გადაგვყავს ლაუტინგით ლოგინზე
+                    localStorage.removeItem('token');
+                    navigate('/login');
                 } else {
-                    // 🟡 თუ მხოლოდ ფოტო/პაროლი შეიცვალა, უბრალოდ ვარეფრეშებთ მიმდინარე გვერდს
-                    alert('Profile updated successfully!');
+                    alert('Updated successfully!');
                     window.location.reload();
                 }
             })
             .catch(err => {
                 console.error(err);
-                alert('Failed to update profile. Username might be taken.');
+                alert('Failed to update: ' + err.message);
             });
     };
 
@@ -562,7 +575,15 @@ export default function ProfilePage() {
                             <h1 className="pp-display-name">{username}</h1>
                             {isOwnProfile && (
                                 <div className="pp-header-actions">
-                                    <button className="pp-edit-btn" onClick={() => setShowEditModal(true)}>Edit Profile</button>
+                                    <button
+                                        className="pp-edit-btn"
+                                        onClick={() => {
+                                            setActiveTab('menu'); // 🟢 ყოველთვის აბრუნებს საწყის მენიუზე გახსნისას
+                                            setShowEditModal(true);
+                                        }}
+                                    >
+                                        Edit Profile
+                                    </button>
                                     <button className="pp-more-btn" aria-label="More options">&hellip;</button>
                                 </div>
                             )}
@@ -571,62 +592,135 @@ export default function ProfilePage() {
 
                     {/* 🟢 EDIT PROFILE მოდალური ფანჯარა */}
                     {showEditModal && (
-                        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }}>
-                            <div style={{ background: '#1c2530', padding: '24px', borderRadius: '12px', width: '360px', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
-                                <h2 style={{ color: '#fff', marginBottom: '20px', fontSize: '18px', textAlign: 'center' }}>Edit Profile</h2>
+                        <div className="modal-overlay" style={{
+                            position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+                            backgroundColor: 'rgba(0, 0, 0, 0.7)', display: 'flex',
+                            justifyContent: 'center', alignItems: 'center', zIndex: 1000
+                        }}>
+                            <div className="modal-content" style={{
+                                backgroundColor: '#1e1e1e', color: '#fff', padding: '30px',
+                                borderRadius: '12px', width: '100%', MarianWidth: '400px',
+                                boxShadow: '0 8px 24px rgba(0,0,0,0.5)', fontFamily: 'sans-serif'
+                            }}>
+                                <div className="modal-header" style={{
+                                    display: 'flex', justifyContent: 'space-between',
+                                    alignItems: 'center', marginBottom: '20px'
+                                }}>
+                                    <h2 style={{ margin: 0, fontSize: '22px', fontWeight: '600' }}>Edit Profile</h2>
+                                    <button
+                                        type="button"
+                                        className="close-btn"
+                                        onClick={() => {
+                                            setShowEditModal(false); setActiveTab('menu');
+                                        }}
+                                        style={{ background: 'none', border: 'none', color: '#888', fontSize: '20px', cursor: 'pointer' }}
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
 
-                                <form onSubmit={handleSaveChanges} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                <form onSubmit={handleSaveChanges}>
+                                    {/* 1. საწყისი არჩევანის მენიუ */}
+                                    {activeTab === 'menu' && (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '10px 0 20px 0' }}>
+                                            <p style={{ color: '#aaa', fontSize: '14px', marginBottom: '10px', textAlign: 'center' }}>
+                                                Select the setting you want to update:
+                                            </p>
 
-                                    {/* მომხმარებლის სახელი */}
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                        <label style={{ color: '#9ab3c8', fontSize: '12px' }}>Username</label>
-                                        <input
-                                            type="text"
-                                            value={newUsername}
-                                            onChange={(e) => setNewUsername(e.target.value)}
-                                            style={{ background: '#0d1117', border: '1px solid rgba(255,255,255,0.1)', padding: '10px', borderRadius: '6px', color: '#fff' }}
-                                        />
+                                            <button type="button" onClick={() => setActiveTab('picture')} className="edit-menu-btn">
+                                                Change Profile Picture
+                                            </button>
+
+                                            <button type="button" onClick={() => setActiveTab('username')} className="edit-menu-btn">
+                                                Change Username
+                                            </button>
+
+                                            <button type="button" onClick={() => setActiveTab('password')} className="edit-menu-btn">
+                                                Change Password
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* 2. ფოტოს შეცვლის ფანჯარა */}
+                                    {activeTab === 'picture' && (
+                                        <div style={{ padding: '10px 0 20px 0' }}>
+                                            <label style={{ display: 'block', marginBottom: '8px', color: '#aaa', fontSize: '14px' }}>
+                                                Upload New Profile Picture
+                                            </label>
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={(e) => setSelectedFile(e.target.files[0])}
+                                                style={{ color: '#ccc', width: '100%', padding: '10px 0' }}
+                                                required
+                                            />
+                                        </div>
+                                    )}
+
+                                    {/* 3. იუზერნეიმის შეცვლის ფანჯარა */}
+                                    {activeTab === 'username' && (
+                                        <div style={{ padding: '10px 0 20px 0' }}>
+                                            <label style={{ display: 'block', marginBottom: '8px', color: '#aaa', fontSize: '14px' }}>
+                                                New Username
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={newUsername}
+                                                onChange={(e) => setNewUsername(e.target.value)}
+                                                placeholder="Enter username"
+                                                className="edit-modal-input"
+                                                required
+                                            />
+                                        </div>
+                                    )}
+
+                                    {/* 4. პაროლის შეცვლის ფანჯარა */}
+                                    {activeTab === 'password' && (
+                                        <div style={{ padding: '10px 0 20px 0' }}>
+                                            <label style={{ display: 'block', marginBottom: '8px', color: '#aaa', fontSize: '14px' }}>
+                                                New Password
+                                            </label>
+                                            <input
+                                                type="password"
+                                                value={newPassword}
+                                                onChange={(e) => setNewPassword(e.target.value)}
+                                                placeholder="Enter new password"
+                                                className="edit-modal-input"
+                                                required
+                                            />
+                                        </div>
+                                    )}
+
+                                    {/* ქვედა სამოქმედო ღილაკები */}
+                                    <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
+                                        {activeTab !== 'menu' ? (
+                                            <>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setActiveTab('menu')}
+                                                    className="edit-action-btn edit-btn-back"
+                                                >
+                                                    Back
+                                                </button>
+                                                <button
+                                                    type="submit"
+                                                    className="edit-action-btn edit-btn-save"
+                                                >
+                                                    Save Changes
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowEditModal(false)}
+                                                className="edit-action-btn edit-btn-cancel"
+                                            >
+                                                Cancel
+                                            </button>
+                                        )}
                                     </div>
 
-                                    {/* ახალი პაროლი */}
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                        <label style={{ color: '#9ab3c8', fontSize: '12px' }}>New Password</label>
-                                        <input
-                                            type="password"
-                                            placeholder="Leave blank to keep current"
-                                            value={newPassword}
-                                            onChange={(e) => setNewPassword(e.target.value)}
-                                            style={{ background: '#0d1117', border: '1px solid rgba(255,255,255,0.1)', padding: '10px', borderRadius: '6px', color: '#fff' }}
-                                        />
-                                    </div>
 
-                                    {/* ფოტოს ატვირთვა */}
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                        <label style={{ color: '#9ab3c8', fontSize: '12px' }}>Profile Picture</label>
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={handleFileChange}
-                                            style={{ color: '#9ab3c8', fontSize: '13px' }}
-                                        />
-                                    </div>
-
-                                    {/* ქვედა ღილაკები */}
-                                    <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowEditModal(false)}
-                                            style={{ flex: 1, padding: '10px', borderRadius: '6px', border: 'none', background: 'rgba(255,255,255,0.1)', color: '#fff', cursor: 'pointer' }}
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            type="submit"
-                                            style={{ flex: 1, padding: '10px', borderRadius: '6px', border: 'none', background: '#00ffd5', color: '#0d1117', fontWeight: 'bold', cursor: 'pointer' }}
-                                        >
-                                            Save
-                                        </button>
-                                    </div>
 
                                 </form>
                             </div>

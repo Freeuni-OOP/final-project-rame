@@ -34,7 +34,6 @@ public class AuthController {
     @Autowired
     private UserRepository userRepository;
 
-    // 🟢 შემოგვაქვს რეპოზიტორიები, სადაც სტრინგ იუზერნეიმები გვიწერია
     @Autowired
     private ActivityRepository activityRepository;
 
@@ -91,30 +90,34 @@ public class AuthController {
 
             boolean usernameChanged = false;
 
+            // 1. თუ ფრონტენდმა გამოატანა ახალი სახელი
             if (newUsername != null && !newUsername.trim().isEmpty() && !newUsername.equals(currentUsername)) {
                 if (userRepository.findByUsername(newUsername).isPresent()) {
                     return ResponseEntity.badRequest().body("Username '" + newUsername + "' is already taken!");
                 }
-
-                // 1. 🟢 ვანახლებთ მხოლოდ იმ ცხრილებს, რომლებიც ID-ზე არ არის მიბმული
-                activityRepository.updateUsernameInActivity(currentUsername, newUsername);
-                recommendationRepository.updateTargetUsername(currentUsername, newUsername);
-                recommendationRepository.updateSenderUsername(currentUsername, newUsername);
-
-                // 2. ვცვლით სახელს მთავარ ობიექტზე
                 user.setUsername(newUsername);
                 usernameChanged = true;
             }
 
+            // 2. თუ ფრონტენდმა გამოატანა ახალი პაროლი
             if (password != null && !password.trim().isEmpty()) {
                 user.setPassword(passwordEncoder.encode(password));
             }
 
+            // 3. თუ ფრონტენდმა გამოატანა ფოტო
             if (file != null && !file.isEmpty()) {
                 user.setProfilePicture(file.getBytes());
             }
 
-            userRepository.save(user);
+            // ვინახავთ მონაცემებს
+            userRepository.saveAndFlush(user);
+
+            // 4. თუ სახელი მართლა შეიცვალა, მხოლოდ მაშინ ვასწორებთ სხვა ცხრილებს
+            if (usernameChanged) {
+                activityRepository.updateUsernameInActivity(currentUsername, newUsername);
+                recommendationRepository.updateTargetUsername(currentUsername, newUsername);
+                recommendationRepository.updateSenderUsername(currentUsername, newUsername);
+            }
 
             return ResponseEntity.ok(java.util.Map.of(
                     "message", "Profile updated successfully!",
@@ -123,6 +126,7 @@ public class AuthController {
             ));
 
         } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.status(500).body("Error: " + e.getMessage());
         }
     }
