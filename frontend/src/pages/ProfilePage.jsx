@@ -7,10 +7,8 @@ const FRIENDS_BASE_URL = 'https://localhost:8443/api/friends';
 // "Films" = number of shows the user has fully watched (COMPLETED),
 // pulled live from the /api/tracking/films-count endpoint.
 
-// No "favorite movies/actors" feature exists on the backend yet, so this
-// tab is entirely fixed placeholder shapes/counts until that data exists.
-const FAVORITE_MOVIES_COUNT = 6;
-const FAVORITE_ACTORS_COUNT = 6;
+// Favorite TV shows live inline on the Profile tab (real, backed by
+// /api/favorites) — there's no separate "Favorites" tab/page.
 
 // Diary is now backed by real logged watch-history (watchDate) from the
 // /api/tracking/diary endpoint. Sort/filter controls are wired to that data.
@@ -211,6 +209,13 @@ export default function ProfilePage() {
     const [watchlistShowIds, setWatchlistShowIds] = useState([]);
     const [watchlistInfo, setWatchlistInfo] = useState({});
     const [friendPosterIds, setFriendPosterIds] = useState({}); // username -> [showId,...] (Network tab-ის რეალური ფოტოებისთვის)
+
+    // Favorite TV Shows — მაქს. 5, ხელით არჩეული (+ დამატების search)
+    const [favoriteShowIds, setFavoriteShowIds] = useState([]);
+    const [favSearch, setFavSearch] = useState('');
+    const [favResults, setFavResults] = useState([]);
+    const [favError, setFavError] = useState('');
+
     const [likedShows, setLikedShows] = useState([]); // Likes tab — [{showId, rating}], ბოლო-პირველი
     const [likesSort, setLikesSort] = useState('liked-desc'); // liked-desc|liked-asc|rating-desc|rating-asc
     const [likesDecade, setLikesDecade] = useState('');
@@ -259,6 +264,7 @@ const loadAll = () => {
             fetch(`https://localhost:8443/api/tracking/activity?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`https://localhost:8443/api/tracking/likes?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`https://localhost:8443/api/tracking/films-count?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : 0)),
+            fetch(`https://localhost:8443/api/favorites?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
         ];
 
         // Private data (own profile only) — მოთხოვნები/რეკომენდაციები მხოლოდ საკუთარია
@@ -277,6 +283,7 @@ const loadAll = () => {
                 activityList = [], 
                 likedIds = [], 
                 filmsCountVal = 0,
+                favIds = [],
                 pendingList = [], 
                 sentlist = [], 
                 recsList = []
@@ -288,7 +295,10 @@ const loadAll = () => {
                 setWatchlistShowIds(watchlistIds || []);
                 (watchlistIds || []).forEach(ensureWatchlistShowInfo);
 
-                setLikedShows(likedIds || []);
+                setFavoriteShowIds(favIds || []);
+                (favIds || []).forEach(ensureWatchlistShowInfo);
+
+                setLikedShows(likedIds || []);
                 (likedIds || []).forEach(it => ensureWatchlistShowInfo(it.showId));
 
                 setDiaryEntries(diaryList || []);
@@ -368,6 +378,47 @@ const loadAll = () => {
                 setWatchlistShowIds(prev => prev.filter(id => id !== showId));
             })
             .catch(err => console.error('Error removing from watchlist:', err));
+    };
+
+    // ── Favorite TV Shows: search + add + remove ──
+    useEffect(() => {
+        if (favSearch.trim().length === 0) { setFavResults([]); return; }
+        const id = setTimeout(() => {
+            fetch(`https://localhost:8443/api/shows/search?query=${encodeURIComponent(favSearch)}&page=1`)
+                .then(r => (r.ok ? r.json() : null))
+                .then(data => setFavResults(data?.results || []))
+                .catch(() => setFavResults([]));
+        }, 300);
+        return () => clearTimeout(id);
+    }, [favSearch]);
+
+    const addFavorite = (show) => {
+        if (!currentUsername || !show?.id) return;
+        setFavError('');
+        fetch(`https://localhost:8443/api/favorites?username=${currentUsername}&showId=${show.id}`, {
+            method: 'POST',
+            headers: authHeaders,
+        })
+            .then(r => (r.ok ? r.json() : r.text().then(m => Promise.reject(m))))
+            .then(ids => {
+                setFavoriteShowIds(ids || []);
+                (ids || []).forEach(ensureWatchlistShowInfo);
+                setFavSearch('');
+                setFavResults([]);
+            })
+            .catch(msg => setFavError(typeof msg === 'string' ? msg : 'Could not add favorite.'));
+    };
+
+    const removeFavorite = (showId) => {
+        if (!currentUsername) return;
+        setFavError('');
+        fetch(`https://localhost:8443/api/favorites?username=${currentUsername}&showId=${showId}`, {
+            method: 'DELETE',
+            headers: authHeaders,
+        })
+            .then(r => (r.ok ? r.json() : []))
+            .then(ids => setFavoriteShowIds(ids || []))
+            .catch(err => console.error('Remove favorite failed:', err));
     };
 
     // ახალ პროფილზე გადასვლისას (network-დან სხვისი პროფილის გახსნისას):
@@ -555,12 +606,6 @@ const loadAll = () => {
                         Profile
                     </span>
                     <span
-                        className={`pp-tab ${activeTab === 'favorites' ? 'pp-tab-active' : ''}`}
-                        onClick={() => setActiveTab('favorites')}
-                    >
-                        Favorites
-                    </span>
-                    <span
                         className={`pp-tab ${activeTab === 'diary' ? 'pp-tab-active' : ''}`}
                         onClick={() => setActiveTab('diary')}
                     >
@@ -592,10 +637,85 @@ const loadAll = () => {
                             <section className="pp-block">
                                 <div className="pp-block-header">
                                     <span className="pp-block-title">Favorite TV Shows</span>
+                                    {isOwnProfile && <span className="pp-block-all">{favoriteShowIds.length}/5</span>}
                                 </div>
-                                <p className="pp-favorite-empty">
-                                    Don&apos;t forget to select your <strong>favorite TV shows</strong>!
-                                </p>
+
+                                {favoriteShowIds.length > 0 && (
+                                    <div className="pp-fav-shows-row">
+                                        {favoriteShowIds.map((showId) => {
+                                            const info = watchlistInfo[showId];
+                                            return (
+                                                <div key={showId} className="pp-fav-show-item">
+                                                    {info?.poster_path ? (
+                                                        <img
+                                                            src={`${POSTER_BASE}${info.poster_path}`}
+                                                            alt={info?.name || ''}
+                                                            className="pp-fav-show-poster"
+                                                            onClick={() => navigate(`/shows/${showId}`)}
+                                                        />
+                                                    ) : (
+                                                        <div
+                                                            className="pp-fav-show-poster pp-fav-show-placeholder"
+                                                            onClick={() => navigate(`/shows/${showId}`)}
+                                                        />
+                                                    )}
+                                                    {isOwnProfile && (
+                                                        <button
+                                                            type="button"
+                                                            className="pp-fav-remove"
+                                                            title="Remove from favorites"
+                                                            onClick={() => removeFavorite(showId)}
+                                                        >
+                                                            ×
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
+                                {isOwnProfile && favoriteShowIds.length < 5 && (
+                                    <div className="pp-fav-add">
+                                        <input
+                                            className="pp-fav-search-input"
+                                            placeholder="Add a TV show..."
+                                            value={favSearch}
+                                            onChange={(e) => setFavSearch(e.target.value)}
+                                        />
+                                        {favSearch.trim() && favResults.length > 0 && (
+                                            <div className="pp-fav-search-results">
+                                                {favResults.slice(0, 6).map((show) => (
+                                                    <div
+                                                        key={show.id}
+                                                        className="pp-fav-search-item"
+                                                        onClick={() => addFavorite(show)}
+                                                    >
+                                                        {show.poster_path ? (
+                                                            <img
+                                                                src={`https://image.tmdb.org/t/p/w92${show.poster_path}`}
+                                                                alt=""
+                                                                className="pp-fav-search-thumb"
+                                                            />
+                                                        ) : (
+                                                            <span className="pp-fav-search-thumb" />
+                                                        )}
+                                                        <span className="pp-fav-search-name">
+                                                            {show.name || show.title}
+                                                            {show.first_air_date ? ` (${show.first_air_date.slice(0, 4)})` : ''}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {favError && <p className="pp-fav-error">{favError}</p>}
+
+                                {favoriteShowIds.length === 0 && !isOwnProfile && (
+                                    <p className="pp-favorite-empty">No favorite TV shows yet.</p>
+                                )}
                             </section>
 
                             {isOwnProfile && (
@@ -833,35 +953,6 @@ const loadAll = () => {
                                 </section>
                             </div>
                         )}
-                    </div>
-                ) : activeTab === 'favorites' ? (
-                    <div className="pp-favorites">
-                        <div className="pp-favorites-header">
-                            <h2 className="pp-favorites-title">Favorites</h2>
-                            <div className="pp-favorites-actions">
-                                <button className="pp-fav-icon-btn" aria-label="Download">⬇</button>
-                                <button className="pp-fav-icon-btn" aria-label="Share">↗</button>
-                                <button className="pp-fav-all-btn">All Favorites</button>
-                            </div>
-                        </div>
-
-                        <section className="pp-fav-section">
-                            <div className="pp-fav-section-title">Movies ({FAVORITE_MOVIES_COUNT})</div>
-                            <div className="pp-fav-grid">
-                                {Array.from({ length: FAVORITE_MOVIES_COUNT }).map((_, i) => (
-                                    <div key={i} className="pp-fav-poster" />
-                                ))}
-                            </div>
-                        </section>
-
-                        <section className="pp-fav-section">
-                            <div className="pp-fav-section-title">Actors ({FAVORITE_ACTORS_COUNT})</div>
-                            <div className="pp-fav-grid">
-                                {Array.from({ length: FAVORITE_ACTORS_COUNT }).map((_, i) => (
-                                    <div key={i} className="pp-fav-actor" />
-                                ))}
-                            </div>
-                        </section>
                     </div>
                 ) : activeTab === 'diary' ? (
                     <div className="pp-diary">
