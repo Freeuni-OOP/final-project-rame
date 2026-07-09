@@ -212,14 +212,22 @@ function FeaturedListCard({ list, posterPaths, itemCount, onOpen }) {
                     {itemCount} {itemCount === 1 ? 'show' : 'shows'}
                 </span>
             </div>
+            <div className="lp-card-stats">
+                <span className="lp-stat">{itemCount} {itemCount === 1 ? 'show' : 'shows'}</span>
+                {showLike && (
+                    <button
+                        type="button"
+                        className={`lp-card-like-btn${liked ? ' lp-card-like-btn-active' : ''}`}
+                        onClick={onLike}
+                        title={liked ? 'Unlike this list' : 'Like this list'}
+                    >
+                        ♥{likeCount > 0 ? ` ${likeCount}` : ''}
+                    </button>
+                )}
+            </div>
         </div>
     );
 }
-
-// Real-data version of ListCard, used for "Featured Lists" once we're
-// pulling actual public lists from the backend instead of placeholder
-// content. Shows who made it and how many shows are in it; no likes/
-// comments since that system doesn't exist yet.
 
 export default function ListsPage() {
     const navigate = useNavigate();
@@ -383,6 +391,21 @@ export default function ListsPage() {
         loadPopularLists();
     }, [loadPopularLists]);
 
+    // Recently Liked — lists the current user has liked, newest-liked-first.
+    // Only fetches when logged in (no username = no liked lists to show).
+    useEffect(() => {
+        if (!username) return;
+        fetch(`${LISTS_BASE_URL}/liked?username=${username}`, { headers: authHeaders })
+            .then(r => (r.ok ? r.json() : []))
+            .then(data => {
+                const rl = data || [];
+                setRecentlyLiked(rl);
+                rl.forEach(l => loadItemsFor(l.id));
+            })
+            .catch(() => setRecentlyLiked([]));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [username]);
+
     const handleCreateList = () => {
         if (!username) return;
         if (!newListName.trim()) {
@@ -408,6 +431,41 @@ export default function ListsPage() {
                 navigate(`/lists/${created.id}/edit`);
             })
             .catch((msg) => setFormError(typeof msg === 'string' ? msg : 'Could not create list.'));
+    };
+
+    // Set of list IDs the current user has liked (derived from recentlyLiked)
+    const likedSet = new Set(recentlyLiked.map(l => l.id));
+
+    const handleCardLike = (list, e) => {
+        e.stopPropagation();
+        if (!username) return;
+
+        const currentlyLiked = likedSet.has(list.id);
+        const currentCount = likeCountOverride[list.id] !== undefined
+            ? likeCountOverride[list.id]
+            : (list.likeCount || 0);
+
+        if (currentlyLiked) {
+            setRecentlyLiked(prev => prev.filter(l => l.id !== list.id));
+            setLikeCountOverride(prev => ({ ...prev, [list.id]: Math.max(0, currentCount - 1) }));
+            fetch(`${LISTS_BASE_URL}/${list.id}/like?username=${username}`, {
+                method: 'POST', headers: authHeaders,
+            }).catch(() => {
+                setRecentlyLiked(prev => [list, ...prev]);
+                setLikeCountOverride(prev => ({ ...prev, [list.id]: currentCount }));
+            });
+        } else {
+            const enriched = { ...list, likeCount: currentCount + 1, likedByMe: true };
+            setRecentlyLiked(prev => [enriched, ...prev]);
+            setLikeCountOverride(prev => ({ ...prev, [list.id]: currentCount + 1 }));
+            if (!itemsByListId[list.id]) loadItemsFor(list.id);
+            fetch(`${LISTS_BASE_URL}/${list.id}/like?username=${username}`, {
+                method: 'POST', headers: authHeaders,
+            }).catch(() => {
+                setRecentlyLiked(prev => prev.filter(l => l.id !== list.id));
+                setLikeCountOverride(prev => ({ ...prev, [list.id]: currentCount }));
+            });
+        }
     };
 
     return (
@@ -516,6 +574,10 @@ export default function ListsPage() {
                                         posterPaths={posterPaths}
                                         itemCount={items.length}
                                         onOpen={(id) => navigate(`/lists/${id}`)}
+                                        liked={likedSet.has(list.id)}
+                                        likeCount={likeCountOverride[list.id] ?? list.likeCount ?? 0}
+                                        onLike={(e) => handleCardLike(list, e)}
+                                        showLike={!!username}
                                     />
                                 );
                             })}
@@ -550,6 +612,10 @@ export default function ListsPage() {
                                         posterPaths={posterPaths}
                                         itemCount={items.length}
                                         onOpen={(id) => navigate(`/lists/${id}`)}
+                                        liked={likedSet.has(list.id)}
+                                        likeCount={likeCountOverride[list.id] ?? list.likeCount ?? 0}
+                                        onLike={(e) => handleCardLike(list, e)}
+                                        showLike={!!username}
                                     />
                                 );
                             })}
