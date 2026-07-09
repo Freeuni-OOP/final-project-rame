@@ -18,7 +18,8 @@ const FAVORITE_ACTORS_COUNT = 6;
 // No "likes" feature exists on the backend yet either, so this tab is
 // genuinely empty (no fabricated rows) — just the filter chrome plus an
 // empty state, matching the real "no data yet" situation.
-const LIKES_SUBTABS = ['Films', 'Reviews', 'Lists'];
+const LIKES_FILTERS = ['Rating', 'Decade', 'Genre', 'Service', 'Sort by When Liked'];
+const LIKES_SUBTABS = ['TV Shows', 'Reviews', 'Lists'];
 
 // Watchlist is backed by the real "PLAN_TO_WATCH" show status (set from the
 // star icon on a show/details page). Backend already returns it newest-added
@@ -27,12 +28,11 @@ const POSTER_BASE = 'https://image.tmdb.org/t/p/w342';
 
 // Network tab reuses the real friends/requests/suggestions backend (same
 // endpoints as the old standalone Members/Friends page) so we don't need a
-// separate page for it. Film/review counts per friend and the eye/grid/heart
-// stats on suggestions are still placeholders (no watch/review feature yet).
+// separate page for it. Film/review counts per friend are still placeholders
+// (no watch/review feature aggregation exists yet).
 const NETWORK_FILM_COUNT = 128;
 const NETWORK_REVIEW_COUNT = 34;
 const NETWORK_POSTER_COUNT = 4;
-const NETWORK_SUGGESTION_STATS = { eye: 1240, grid: 18, heart: 326 };
 
 const AVATAR_COLORS = ['#00b4a2', '#e85d75', '#f2b134', '#5b8def', '#9b59b6', '#2ecc71'];
 
@@ -58,22 +58,6 @@ function HeartIcon() {
     return (
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
             <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z" />
-        </svg>
-    );
-}
-
-function EyeIcon() {
-    return (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 5c-7 0-10 7-10 7s3 7 10 7 10-7 10-7-3-7-10-7zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8z" />
-        </svg>
-    );
-}
-
-function GridIcon() {
-    return (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" />
         </svg>
     );
 }
@@ -212,7 +196,7 @@ export default function ProfilePage() {
     const [filmsCount, setFilmsCount] = useState(0);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('profile');
-    const [likesSubTab, setLikesSubTab] = useState('Films');
+    const [likesSubTab, setLikesSubTab] = useState('TV Shows');
     const [activities, setActivities] = useState([]);
 
     const [friends, setFriends] = useState([]);
@@ -226,6 +210,7 @@ export default function ProfilePage() {
 
     const [watchlistShowIds, setWatchlistShowIds] = useState([]);
     const [watchlistInfo, setWatchlistInfo] = useState({});
+    const [friendPosterIds, setFriendPosterIds] = useState({}); // username -> [showId,...] (Network tab-ის რეალური ფოტოებისთვის)
     const [likedShows, setLikedShows] = useState([]); // Likes tab — [{showId, rating}], ბოლო-პირველი
     const [likesSort, setLikesSort] = useState('liked-desc'); // liked-desc|liked-asc|rating-desc|rating-asc
     const [likesDecade, setLikesDecade] = useState('');
@@ -253,57 +238,79 @@ export default function ProfilePage() {
     const isOwnProfile = !routeUsername || routeUsername === currentUsername;
     const authHeaders = { Authorization: `Bearer ${token}` };
 
-    const loadAll = () => {
-        if (!username) return;
-        setLoading(true);
 
-        const authHeaders = { Authorization: `Bearer ${token}` };
+const loadAll = () => {
+        if (!username) return;
+        setLoading(true);
 
-        // საჯარო მონაცემი (ნებისმიერი იუზერის): მეგობრები + watchlist + diary
-        const publicCalls = [
-            fetch(`${FRIENDS_BASE_URL}?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-            fetch(`https://localhost:8443/api/tracking/watchlist?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-            fetch(`https://localhost:8443/api/tracking/diary?username=${username}&viewer=${currentUsername || ''}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-            fetch(`https://localhost:8443/api/tracking/likes?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-            fetch(`https://localhost:8443/api/tracking/films-count?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : 0)),
-        ];
+        const authHeaders = { Authorization: `Bearer ${token}` };
 
-        // Private data (own profile only)
-        const privateCalls = isOwnProfile ? [
-            fetch(`${FRIENDS_BASE_URL}/pending?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-            fetch(`${FRIENDS_BASE_URL}/sent?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-            fetch(`${FRIENDS_BASE_URL}/suggestions?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-            fetch(`https://localhost:8443/api/tracking/recommendations?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-            fetch(`https://localhost:8443/api/tracking/activity?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : []))
-        ] : [];
+        // საჯარო მონაცემი (ნებისმიერი იუზერის): მეგობრები + watchlist + diary +
+        // "People you may know" — ეს ყოველთვის შემხედველის (currentUsername) შემოთავაზებაა,
+        // ამიტომ ჩანს ნებისმიერი პროფილის Network ტაბზეც, არა მხოლოდ საკუთარზე.
+        const publicCalls = [
+            fetch(`${FRIENDS_BASE_URL}?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+            fetch(`https://localhost:8443/api/tracking/watchlist?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+         
+            fetch(`https://localhost:8443/api/tracking/diary?username=${username}&viewer=${currentUsername || ''}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+            currentUsername
+                ? fetch(`${FRIENDS_BASE_URL}/suggestions?actingUsername=${currentUsername}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : []))
+                : Promise.resolve([]),
+            fetch(`https://localhost:8443/api/tracking/activity?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+            fetch(`https://localhost:8443/api/tracking/likes?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+            fetch(`https://localhost:8443/api/tracking/films-count?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : 0)),
+        ];
 
-        Promise.all([...publicCalls, ...privateCalls])
-    .then(([friendsList, watchlistIds, diaryList, likedIds = [], filmsCountVal = 0,pendingList = [], sentlist = [], suggestionslist = [], recsList = [], activityList = []]) => {
+        // Private data (own profile only) — მოთხოვნები/რეკომენდაციები მხოლოდ საკუთარია
+        const privateCalls = isOwnProfile ? [
+            fetch(`${FRIENDS_BASE_URL}/pending?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+            fetch(`${FRIENDS_BASE_URL}/sent?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+            fetch(`https://localhost:8443/api/tracking/recommendations?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+        ] : [];
 
+        Promise.all([...publicCalls, ...privateCalls])
+            .then(([
+                friendsList, 
+                watchlistIds, 
+                diaryList, 
+                suggestionslist = [], 
+                activityList = [], 
+                likedIds = [], 
+                filmsCountVal = 0,
+                pendingList = [], 
+                sentlist = [], 
+                recsList = []
+            ]) => {
 
-        setFriends(friendsList || []);
-        setFriendsCount((friendsList || []).length);
-        setFilmsCount(Number(filmsCountVal) || 0);
-        setWatchlistShowIds(watchlistIds || []);
-        (watchlistIds || []).forEach(ensureWatchlistShowInfo);
+                setFriends(friendsList || []);
+                setFriendsCount((friendsList || []).length);
+                setFilmsCount(Number(filmsCountVal) || 0);
+                setWatchlistShowIds(watchlistIds || []);
+                (watchlistIds || []).forEach(ensureWatchlistShowInfo);
 
-        setLikedShows(likedIds || []);
-        (likedIds || []).forEach(it => ensureWatchlistShowInfo(it.showId));
+                setLikedShows(likedIds || []);
+                (likedIds || []).forEach(it => ensureWatchlistShowInfo(it.showId));
 
-        setDiaryEntries(diaryList || []);
-        (diaryList || []).forEach(e => ensureWatchlistShowInfo(e.showId));
+                setDiaryEntries(diaryList || []);
+                (diaryList || []).forEach(e => ensureWatchlistShowInfo(e.showId));
 
-        if (isOwnProfile) {
-            setPending(pendingList || []);
-            setSent(sentlist || []);
-            setSuggestions(suggestionslist || []);
-            setRecommendations(recsList || []);
-            setActivities((activityList || []).sort((a, b) => b.id - a.id));
-        }
-    })
-            .catch(err => console.error("Error loading profile data:", err))
-            .finally(() => setLoading(false));
-    };
+                setSuggestions(suggestionslist || []);
+                setActivities((activityList || []).sort((a, b) => b.id - a.id));
+
+                if (isOwnProfile) {
+                    setPending(pendingList || []);
+                    setSent(sentlist || []);
+                    setRecommendations(recsList || []);
+                } else {
+                    setPending([]);
+                    setSent([]);
+                    setRecommendations([]);
+                }
+            })
+            .catch(err => console.error("Error loading profile data:", err))
+            .finally(() => setLoading(false));
+    };
+
 
     // Mirrors ListDetailPage's per-show info fetch: the watchlist endpoint
     // only returns raw showIds, so poster/title come from a per-id lookup,
@@ -329,6 +336,27 @@ export default function ProfilePage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [token]);
 
+    // Network tab: მეგობრის ბოლოს ნანახი შოუების პოსტერები (Diary-დან, უახლესი პირველი)
+    const requestedFriendPosters = useRef(new Set());
+    const ensureFriendPosters = useCallback((friendUsername) => {
+        if (!friendUsername || requestedFriendPosters.current.has(friendUsername)) return;
+        requestedFriendPosters.current.add(friendUsername);
+        fetch(`https://localhost:8443/api/tracking/diary?username=${friendUsername}`, { headers: authHeaders })
+            .then(r => (r.ok ? r.json() : []))
+            .then(data => {
+                const ids = [...new Set((data || []).map(e => e.showId))].slice(0, NETWORK_POSTER_COUNT);
+                setFriendPosterIds(prev => ({ ...prev, [friendUsername]: ids }));
+                ids.forEach(ensureWatchlistShowInfo);
+            })
+            .catch(() => {});
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [token, ensureWatchlistShowInfo]);
+
+    useEffect(() => {
+        friends.forEach(ensureFriendPosters);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [friends]);
+
     const handleRemoveFromWatchlist = (showId) => {
         if (!username) return;
         fetch(`https://localhost:8443/api/tracking/show-status?username=${username}&showId=${showId}`, {
@@ -342,6 +370,21 @@ export default function ProfilePage() {
             .catch(err => console.error('Error removing from watchlist:', err));
     };
 
+    // ახალ პროფილზე გადასვლისას (network-დან სხვისი პროფილის გახსნისას):
+    // 1) ყოველთვის "Profile" ტაბით დავიწყოთ; 2) ძველი პროფილის მონაცემი გავასუფთაოთ,
+    // რომ ახალის ჩატვირთვამდე წამით არ გამოჩნდეს.
+    useEffect(() => {
+        setActiveTab('profile');
+        setActivities([]);
+        setFriends([]);
+        setFriendsCount(0);
+        setWatchlistShowIds([]);
+        setDiaryEntries([]);
+        setPending([]);
+        setSent([]);
+        setRecommendations([]);
+    }, [routeUsername]);
+
     useEffect(() => {
         if (!username) {
             setLoading(false);
@@ -353,9 +396,11 @@ export default function ProfilePage() {
 
     const handleSendRequest = (targetUsername) => {
         const recipient = (targetUsername || addUsername).trim();
-        if (!recipient) return;
+        if (!recipient || !currentUsername) return;
         setPanelMessage('');
-        fetch(`${FRIENDS_BASE_URL}/request?actingUsername=${username}&targetUsername=${recipient}`, {
+        // ყოველთვის შემხედველის (currentUsername) სახელით იგზავნება — თუნდაც
+        // "People you may know" სხვისი პროფილიდან იყოს გახსნილი
+        fetch(`${FRIENDS_BASE_URL}/request?actingUsername=${currentUsername}&targetUsername=${recipient}`, {
             method: 'POST',
             headers: authHeaders,
         })
@@ -493,7 +538,7 @@ export default function ProfilePage() {
                     <div className="pp-stats">
                         <div className="pp-stat-item">
                             <span className="pp-stat-num">{loading ? '–' : filmsCount}</span>
-                            <span className="pp-stat-label">Films</span>
+                            <span className="pp-stat-label">TV Shows</span>
                         </div>
                         <div className="pp-stat-item">
                             <span className="pp-stat-num">{loading ? '–' : friendsCount}</span>
@@ -546,10 +591,10 @@ export default function ProfilePage() {
                         <div className="pp-body-left">
                             <section className="pp-block">
                                 <div className="pp-block-header">
-                                    <span className="pp-block-title">Favorite Films</span>
+                                    <span className="pp-block-title">Favorite TV Shows</span>
                                 </div>
                                 <p className="pp-favorite-empty">
-                                    Don&apos;t forget to select your <strong>favorite films</strong>!
+                                    Don&apos;t forget to select your <strong>favorite TV shows</strong>!
                                 </p>
                             </section>
 
@@ -853,7 +898,7 @@ export default function ProfilePage() {
                             <div className="pp-diary-table">
                                 <div className="pp-diary-row pp-diary-row-head">
                                     <span className="pp-diary-col-date">Date</span>
-                                    <span className="pp-diary-col-film">Film</span>
+                                    <span className="pp-diary-col-film">Show</span>
                                     <span className="pp-diary-col-released">Released</span>
                                     <span className="pp-diary-col-rating">Rating</span>
                                     <span className="pp-diary-col-like">Like</span>
@@ -1014,11 +1059,11 @@ export default function ProfilePage() {
                     </div>
                 ) : activeTab === 'watchlist' ? (
                     <div className="pp-watchlist-solo">
-                        <div className="pp-watchlist-title">You want to see {watchlistShowIds.length} film{watchlistShowIds.length === 1 ? '' : 's'}</div>
+                        <div className="pp-watchlist-title">You want to see {watchlistShowIds.length} TV show{watchlistShowIds.length === 1 ? '' : 's'}</div>
 
                         {watchlistShowIds.length === 0 ? (
                             <div className="pp-likes-empty-box">
-                                <p className="pp-likes-empty-text">No films yet</p>
+                                <p className="pp-likes-empty-text">No TV shows yet</p>
                             </div>
                         ) : (
                             <div className="pp-watchlist-poster-grid">
@@ -1063,27 +1108,49 @@ export default function ProfilePage() {
                     <div className="pp-network">
                         <div className="pp-network-row">
                             <section className="pp-block pp-network-col">
-                                <div className="pp-kicker">Your Network</div>
+                                <div className="pp-kicker">{isOwnProfile ? 'Your Network' : `${username}'s Network`}</div>
                                 {friends.length === 0 ? (
-                                    <div className="pp-section-empty">You haven&apos;t added any friends yet.</div>
+                                    <div className="pp-section-empty">
+                                        {isOwnProfile ? "You haven't added any friends yet." : `${username} hasn't added any friends yet.`}
+                                    </div>
                                 ) : (
                                     <div className="pp-network-scroll">
-                                        {friends.map((name) => (
-                                            <div key={name} className="pp-network-card">
-                                                <div className="pp-network-card-top">
-                                                    <Avatar name={name} size={64} />
-                                                    <span className="pp-network-name">{name}</span>
-                                                    <span className="pp-network-stats">
-                                                        {NETWORK_FILM_COUNT} films &bull; {NETWORK_REVIEW_COUNT} reviews
-                                                    </span>
+                                        {friends.map((name) => {
+                                            const posterIds = friendPosterIds[name] || [];
+                                            return (
+                                                <div key={name} className="pp-network-card">
+                                                    <div
+                                                        className="pp-network-card-top"
+                                                        style={{ cursor: 'pointer' }}
+                                                        onClick={() => navigate(`/profile/${name}`)}
+                                                        title={`View ${name}'s profile`}
+                                                    >
+                                                        <Avatar name={name} size={64} />
+                                                        <span className="pp-network-name">{name}</span>
+                                                        <span className="pp-network-stats">
+                                                            {NETWORK_FILM_COUNT} TV shows &bull; {NETWORK_REVIEW_COUNT} reviews
+                                                        </span>
+                                                    </div>
+                                                    <div className="pp-poster-row">
+                                                        {Array.from({ length: NETWORK_POSTER_COUNT }).map((_, i) => {
+                                                            const showId = posterIds[i];
+                                                            const info = showId ? watchlistInfo[showId] : null;
+                                                            return info?.poster_path ? (
+                                                                <img
+                                                                    key={i}
+                                                                    src={`${POSTER_BASE}${info.poster_path}`}
+                                                                    alt={info?.name || ''}
+                                                                    className="pp-poster-real"
+                                                                    onClick={() => navigate(`/shows/${showId}`)}
+                                                                />
+                                                            ) : (
+                                                                <div key={i} className="pp-poster-placeholder" />
+                                                            );
+                                                        })}
+                                                    </div>
                                                 </div>
-                                                <div className="pp-poster-row">
-                                                    {Array.from({ length: NETWORK_POSTER_COUNT }).map((_, i) => (
-                                                        <div key={i} className="pp-poster-placeholder" />
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </section>
@@ -1155,7 +1222,7 @@ export default function ProfilePage() {
                             )}
                         </div>
 
-                        {isOwnProfile && (
+                        {currentUsername && (
                             <section className="pp-block">
                                 <div className="pp-kicker">People you may know</div>
                                 {suggestions.length === 0 ? (
@@ -1164,17 +1231,19 @@ export default function ProfilePage() {
                                     <div className="pp-suggestions-list">
                                         {suggestions.map((s) => (
                                             <div key={s.username} className="pp-suggestion-row">
-                                                <Avatar name={s.username} size={44} />
-                                                <div className="pp-suggestion-info">
-                                                    <span className="pp-suggestion-name">{s.username}</span>
-                                                    <span className="pp-suggestion-sub">
-                                                    {s.mutualFriendCount} mutual friend{s.mutualFriendCount === 1 ? '' : 's'}
-                                                </span>
-                                                </div>
-                                                <div className="pp-suggestion-stats">
-                                                    <span className="pp-stat"><EyeIcon /> {NETWORK_SUGGESTION_STATS.eye}</span>
-                                                    <span className="pp-stat"><GridIcon /> {NETWORK_SUGGESTION_STATS.grid}</span>
-                                                    <span className="pp-stat"><HeartIcon /> {NETWORK_SUGGESTION_STATS.heart}</span>
+                                                <div
+                                                    className="pp-suggestion-clickable"
+                                                    style={{ cursor: 'pointer' }}
+                                                    onClick={() => navigate(`/profile/${s.username}`)}
+                                                    title={`View ${s.username}'s profile`}
+                                                >
+                                                    <Avatar name={s.username} size={44} />
+                                                    <div className="pp-suggestion-info">
+                                                        <span className="pp-suggestion-name">{s.username}</span>
+                                                        <span className="pp-suggestion-sub">
+                                                        {s.mutualFriendCount} mutual friend{s.mutualFriendCount === 1 ? '' : 's'}
+                                                    </span>
+                                                    </div>
                                                 </div>
                                                 <button className="pp-add-circle-btn" onClick={() => handleSendRequest(s.username)}>+</button>
                                             </div>

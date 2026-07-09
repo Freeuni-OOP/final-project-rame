@@ -113,10 +113,10 @@ public class FriendServiceImpl implements FriendService {
 
     @Override
     public List<FriendSuggestionDto> getSuggestedFriends(String username) {
-        // "People you may know": anyone who shares at least one friend with
-        // you, but isn't already your friend and has no pending request
-        // with you in either direction. Ranked by how many friends you
-        // have in common with them - more mutual friends, higher up the list.
+        // "People you may know": ნებისმიერი დარეგისტრირებული იუზერი, ვინც არ
+        // ხარ უკვე მეგობარი და არც pending request გაქვს მასთან (არც
+        // გაგზავნილი, არც მიღებული). მეგობრის-მეგობრები მაღლა ჩნდებიან
+        // (mutual friend count-ით დალაგებული), დანარჩენები — ქვემოთ.
 
         List<User> myFriends = getFriends(username);
 
@@ -136,6 +136,14 @@ public class FriendServiceImpl implements FriendService {
                 if (!excluded.contains(candidate)) {
                     mutualCounts.merge(candidate, 1, Integer::sum);
                 }
+            }
+        }
+
+        // ყველა დანარჩენი დარეგისტრირებული იუზერი (mutual friend გარეშეც) —
+        // 0 mutual-ით ემატება სიას, რომ suggestion-ები ცარიელი აღარ დარჩეს.
+        for (User candidate : userRepository.findAll()) {
+            if (!excluded.contains(candidate.getUsername())) {
+                mutualCounts.putIfAbsent(candidate.getUsername(), 0);
             }
         }
 

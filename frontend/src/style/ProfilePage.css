@@ -1116,6 +1116,20 @@
     border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+.pp-poster-real {
+    width: 32px;
+    height: 48px;
+    border-radius: 4px;
+    object-fit: cover;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    cursor: pointer;
+    transition: transform 0.15s ease;
+}
+
+.pp-poster-real:hover {
+    transform: translateY(-2px);
+}
+
 .pp-requests-tabs {
     display: flex;
     gap: 8px;
@@ -1252,6 +1266,14 @@
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+.pp-suggestion-clickable {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex: 1;
+    min-width: 0;
+}
+
 .pp-suggestion-info {
     display: flex;
     flex-direction: column;
@@ -1268,19 +1290,6 @@
 .pp-suggestion-sub {
     color: #5f758a;
     font-size: 0.78rem;
-}
-
-.pp-suggestion-stats {
-    display: flex;
-    gap: 16px;
-    color: #7c93a8;
-    font-size: 0.8rem;
-}
-
-.pp-stat {
-    display: flex;
-    align-items: center;
-    gap: 5px;
 }
 
 .pp-add-circle-btn {
@@ -1340,10 +1349,6 @@
     }
 
     .pp-diary-col-rewatch {
-        display: none;
-    }
-
-    .pp-suggestion-stats {
         display: none;
     }
 
