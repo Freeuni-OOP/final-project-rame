@@ -61,6 +61,34 @@
     background: rgba(255, 255, 255, 0.16);
 }
 
+.ldp-like-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: none;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 5px;
+    color: #7c93a8;
+    font-size: 0.85rem;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.ldp-like-btn:hover {
+    color: #e85d75;
+    border-color: rgba(232, 93, 117, 0.4);
+}
+
+.ldp-like-btn-active {
+    color: #e85d75;
+    border-color: rgba(232, 93, 117, 0.5);
+}
+
+.ldp-like-count {
+    font-size: 0.8rem;
+}
+
 .ldp-meta {
     display: flex;
     align-items: center;

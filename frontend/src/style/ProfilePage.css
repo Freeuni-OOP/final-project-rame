@@ -739,6 +739,32 @@
     font-size: 0.85rem;
 }
 
+/* Diary review like (others' profile) — heart above count */
+.pp-diary-like-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    line-height: 1;
+}
+
+.pp-diary-like-heart {
+    font-size: 16px;
+    line-height: 1;
+    user-select: none;
+    transition: transform 0.12s ease;
+}
+
+.pp-diary-like-heart:hover {
+    transform: scale(1.15);
+}
+
+.pp-diary-like-count {
+    font-size: 11px;
+    color: #9aabbc;
+    line-height: 1;
+}
+
 /* ── Diary edit modal ── */
 .pp-modal-overlay {
     position: fixed;

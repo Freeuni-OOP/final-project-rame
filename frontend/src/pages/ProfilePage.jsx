@@ -4,10 +4,8 @@ import '../style/ProfilePage.css';
 
 const FRIENDS_BASE_URL = 'https://localhost:8443/api/friends';
 
-// The backend has no "films watched" / "favorite films" feature yet, so
-// this is a deliberately fixed placeholder until that exists. Friends
-// count below is real (pulled from the Friends endpoint).
-const PLACEHOLDER_FILMS_COUNT = 0;
+// "Films" = number of shows the user has fully watched (COMPLETED),
+// pulled live from the /api/tracking/films-count endpoint.
 
 // No "favorite movies/actors" feature exists on the backend yet, so this
 // tab is entirely fixed placeholder shapes/counts until that data exists.
@@ -195,6 +193,7 @@ export default function ProfilePage() {
     const navigate = useNavigate();
     const { username: routeUsername } = useParams();
     const [friendsCount, setFriendsCount] = useState(0);
+    const [filmsCount, setFilmsCount] = useState(0);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('profile');
     const [likesSubTab, setLikesSubTab] = useState('TV Shows');
@@ -212,6 +211,10 @@ export default function ProfilePage() {
     const [watchlistShowIds, setWatchlistShowIds] = useState([]);
     const [watchlistInfo, setWatchlistInfo] = useState({});
     const [friendPosterIds, setFriendPosterIds] = useState({}); // username -> [showId,...] (Network tab-ის რეალური ფოტოებისთვის)
+    const [likedShows, setLikedShows] = useState([]); // Likes tab — [{showId, rating}], ბოლო-პირველი
+    const [likesSort, setLikesSort] = useState('liked-desc'); // liked-desc|liked-asc|rating-desc|rating-asc
+    const [likesDecade, setLikesDecade] = useState('');
+    const [likesGenre, setLikesGenre] = useState('');
 
     // Diary — რეალური, დათარიღებული ჩანაწერები + სორტი/ფილტრები
     const [diaryEntries, setDiaryEntries] = useState([]);
@@ -235,62 +238,79 @@ export default function ProfilePage() {
     const isOwnProfile = !routeUsername || routeUsername === currentUsername;
     const authHeaders = { Authorization: `Bearer ${token}` };
 
-    const loadAll = () => {
-        if (!username) return;
-        setLoading(true);
 
-        const authHeaders = { Authorization: `Bearer ${token}` };
+const loadAll = () => {
+        if (!username) return;
+        setLoading(true);
 
-        // საჯარო მონაცემი (ნებისმიერი იუზერის): მეგობრები + watchlist + diary +
-        // "People you may know" — ეს ყოველთვის შემხედველის (currentUsername) შემოთავაზებაა,
-        // ამიტომ ჩანს ნებისმიერი პროფილის Network ტაბზეც, არა მხოლოდ საკუთარზე.
-        const publicCalls = [
-            fetch(`${FRIENDS_BASE_URL}?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-            fetch(`https://localhost:8443/api/tracking/watchlist?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-            fetch(`https://localhost:8443/api/tracking/diary?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-            currentUsername
-                ? fetch(`${FRIENDS_BASE_URL}/suggestions?actingUsername=${currentUsername}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : []))
-                : Promise.resolve([]),
-            // Recent activity — ამ პროფილის მფლობელის (username), არა შემხედველის.
-            // ამიტომ public-ია: სხვის გვერდზეც მისი აქტივობა უნდა ჩანდეს, არა ჩემი.
-            fetch(`https://localhost:8443/api/tracking/activity?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-        ];
+        const authHeaders = { Authorization: `Bearer ${token}` };
 
-        // Private data (own profile only) — მოთხოვნები/რეკომენდაციები მხოლოდ საკუთარია
-        const privateCalls = isOwnProfile ? [
-            fetch(`${FRIENDS_BASE_URL}/pending?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-            fetch(`${FRIENDS_BASE_URL}/sent?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-            fetch(`https://localhost:8443/api/tracking/recommendations?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-        ] : [];
+        // საჯარო მონაცემი (ნებისმიერი იუზერის): მეგობრები + watchlist + diary +
+        // "People you may know" — ეს ყოველთვის შემხედველის (currentUsername) შემოთავაზებაა,
+        // ამიტომ ჩანს ნებისმიერი პროფილის Network ტაბზეც, არა მხოლოდ საკუთარზე.
+        const publicCalls = [
+            fetch(`${FRIENDS_BASE_URL}?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+            fetch(`https://localhost:8443/api/tracking/watchlist?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+         
+            fetch(`https://localhost:8443/api/tracking/diary?username=${username}&viewer=${currentUsername || ''}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+            currentUsername
+                ? fetch(`${FRIENDS_BASE_URL}/suggestions?actingUsername=${currentUsername}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : []))
+                : Promise.resolve([]),
+            fetch(`https://localhost:8443/api/tracking/activity?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+            fetch(`https://localhost:8443/api/tracking/likes?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+            fetch(`https://localhost:8443/api/tracking/films-count?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : 0)),
+        ];
 
-        Promise.all([...publicCalls, ...privateCalls])
-    .then(([friendsList, watchlistIds, diaryList, suggestionslist = [], activityList = [], pendingList = [], sentlist = [], recsList = []]) => {
+        // Private data (own profile only) — მოთხოვნები/რეკომენდაციები მხოლოდ საკუთარია
+        const privateCalls = isOwnProfile ? [
+            fetch(`${FRIENDS_BASE_URL}/pending?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+            fetch(`${FRIENDS_BASE_URL}/sent?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+            fetch(`https://localhost:8443/api/tracking/recommendations?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+        ] : [];
 
-        setFriends(friendsList || []);
-        setFriendsCount((friendsList || []).length);
-        setWatchlistShowIds(watchlistIds || []);
-        (watchlistIds || []).forEach(ensureWatchlistShowInfo);
+        Promise.all([...publicCalls, ...privateCalls])
+            .then(([
+                friendsList, 
+                watchlistIds, 
+                diaryList, 
+                suggestionslist = [], 
+                activityList = [], 
+                likedIds = [], 
+                filmsCountVal = 0,
+                pendingList = [], 
+                sentlist = [], 
+                recsList = []
+            ]) => {
 
-        setDiaryEntries(diaryList || []);
-        (diaryList || []).forEach(e => ensureWatchlistShowInfo(e.showId));
+                setFriends(friendsList || []);
+                setFriendsCount((friendsList || []).length);
+                setFilmsCount(Number(filmsCountVal) || 0);
+                setWatchlistShowIds(watchlistIds || []);
+                (watchlistIds || []).forEach(ensureWatchlistShowInfo);
 
-        setSuggestions(suggestionslist || []);
-        setActivities((activityList || []).sort((a, b) => b.id - a.id));
+                setLikedShows(likedIds || []);
+                (likedIds || []).forEach(it => ensureWatchlistShowInfo(it.showId));
 
-        if (isOwnProfile) {
-            setPending(pendingList || []);
-            setSent(sentlist || []);
-            setRecommendations(recsList || []);
-        } else {
-            // სხვის პროფილზე პირადი მონაცემი არ ჩანს — ძველი (ჩემი) გავასუფთაოთ
-            setPending([]);
-            setSent([]);
-            setRecommendations([]);
-        }
-    })
-            .catch(err => console.error("Error loading profile data:", err))
-            .finally(() => setLoading(false));
-    };
+                setDiaryEntries(diaryList || []);
+                (diaryList || []).forEach(e => ensureWatchlistShowInfo(e.showId));
+
+                setSuggestions(suggestionslist || []);
+                setActivities((activityList || []).sort((a, b) => b.id - a.id));
+
+                if (isOwnProfile) {
+                    setPending(pendingList || []);
+                    setSent(sentlist || []);
+                    setRecommendations(recsList || []);
+                } else {
+                    setPending([]);
+                    setSent([]);
+                    setRecommendations([]);
+                }
+            })
+            .catch(err => console.error("Error loading profile data:", err))
+            .finally(() => setLoading(false));
+    };
+
 
     // Mirrors ListDetailPage's per-show info fetch: the watchlist endpoint
     // only returns raw showIds, so poster/title come from a per-id lookup,
@@ -441,6 +461,51 @@ export default function ProfilePage() {
             if (diarySort === 'rating-desc') return (b.rating || 0) - (a.rating || 0);
             if (diarySort === 'rating-asc') return (a.rating || 0) - (b.rating || 0);
             return (b.watchDate || '').localeCompare(a.watchDate || ''); // date-desc (default)
+        });
+
+    // სხვისი diary-ჩანაწერის (რევიუს) ლაიქის toggle
+    const handleDiaryReviewLike = (entry) => {
+        if (!currentUsername || !entry.reviewId) return;
+        fetch(`https://localhost:8443/api/reviews/like?username=${currentUsername}&reviewType=${entry.reviewType}&reviewId=${entry.reviewId}`, {
+            method: 'POST',
+            headers: authHeaders,
+        })
+            .then(r => (r.ok ? r.json() : null))
+            .then(data => {
+                if (!data) return;
+                setDiaryEntries(prev => prev.map(e =>
+                    (e.reviewId === entry.reviewId && e.reviewType === entry.reviewType)
+                        ? { ...e, likeCount: data.likeCount, likedByMe: data.liked }
+                        : e
+                ));
+            })
+            .catch(err => console.error("Diary review like failed:", err));
+    };
+    // ── Likes: მოწონებულ შოუებს ვამდიდრებთ TMDB info-თი, ვფილტრავთ და ვასორტირებთ ──
+    const likesDisplay = likedShows.map((it, idx) => {
+        const info = watchlistInfo[it.showId] || {};
+        return {
+            showId: it.showId,
+            rating: it.rating || 0,
+            likedOrder: idx, // 0 = ბოლოს მოწონებული (backend-ის id DESC რიგი)
+            poster_path: info.poster_path || null,
+            name: info.name || '',
+            released: info.year || '',
+            genres: info.genres || [],
+        };
+    });
+
+    const likesDecades = [...new Set(likesDisplay.map(d => decadeOf(d.released)).filter(Boolean))].sort().reverse();
+    const likesGenres = [...new Set(likesDisplay.flatMap(d => d.genres))].sort();
+
+    const visibleLikes = likesDisplay
+        .filter(d => !likesDecade || decadeOf(d.released) === likesDecade)
+        .filter(d => !likesGenre || d.genres.includes(likesGenre))
+        .sort((a, b) => {
+            if (likesSort === 'liked-asc') return b.likedOrder - a.likedOrder;
+            if (likesSort === 'rating-desc') return b.rating - a.rating;
+            if (likesSort === 'rating-asc') return a.rating - b.rating;
+            return a.likedOrder - b.likedOrder; // liked-desc (ბოლოს მოწონებული პირველი) — default
         });
 
     if (!username) {
@@ -839,7 +904,7 @@ export default function ProfilePage() {
                                     <span className="pp-diary-col-like">Like</span>
                                     <span className="pp-diary-col-rewatch">Rewatch</span>
                                     <span className="pp-diary-col-review">Review</span>
-                                    <span className="pp-diary-col-edit">Edit</span>
+                                    <span className="pp-diary-col-edit">{isOwnProfile ? 'Edit' : 'Like'}</span>
                                 </div>
 
                                 {visibleDiary.map((entry, i) => {
@@ -887,7 +952,7 @@ export default function ProfilePage() {
                                                 {entry.review || ''}
                                             </span>
                                             <span className="pp-diary-col-edit">
-                                                {isOwnProfile && (
+                                                {isOwnProfile ? (
                                                     <span
                                                         className="pp-diary-edit-icon"
                                                         style={{ cursor: 'pointer' }}
@@ -895,6 +960,20 @@ export default function ProfilePage() {
                                                         onClick={() => setEditingEntry(entry)}
                                                     >
                                                         ✎
+                                                    </span>
+                                                ) : (
+                                                    <span
+                                                        className="pp-diary-like-cell"
+                                                        title={entry.likedByMe ? 'Unlike' : 'Like this review'}
+                                                    >
+                                                        <span
+                                                            className="pp-diary-like-heart"
+                                                            style={{ cursor: 'pointer', color: entry.likedByMe ? '#e85d75' : '#5f758a' }}
+                                                            onClick={() => handleDiaryReviewLike(entry)}
+                                                        >
+                                                            {entry.likedByMe ? '♥' : '♡'}
+                                                        </span>
+                                                        <span className="pp-diary-like-count">{entry.likeCount || 0}</span>
                                                     </span>
                                                 )}
                                             </span>
@@ -918,22 +997,65 @@ export default function ProfilePage() {
                             ))}
                         </div>
 
-                        <div className="pp-likes-filters-row">
-                            <div className="pp-likes-filters">
-                                {LIKES_FILTERS.map((f) => (
-                                    <span key={f} className="pp-diary-filter">{f} ▾</span>
-                                ))}
-                                <span className="pp-diary-eye" aria-label="Toggle visibility">👁</span>
+                        {likesSubTab === 'Films' && (
+                            <div className="pp-likes-filters-row">
+                                <div className="pp-likes-filters">
+                                    <span
+                                        className="pp-diary-filter"
+                                        style={{ cursor: 'pointer', color: likesSort.startsWith('rating') ? '#00b4a2' : undefined }}
+                                        onClick={() => setLikesSort(likesSort === 'rating-desc' ? 'rating-asc' : 'rating-desc')}
+                                    >
+                                        Rating {likesSort === 'rating-asc' ? '▴' : '▾'}
+                                    </span>
+                                    <DiaryDropdown label="Decade" value={likesDecade} options={likesDecades} onChange={setLikesDecade} />
+                                    <DiaryDropdown label="Genre" value={likesGenre} options={likesGenres} onChange={setLikesGenre} />
+                                    <span
+                                        className="pp-diary-filter"
+                                        style={{ cursor: 'pointer', color: likesSort.startsWith('liked') ? '#00b4a2' : undefined }}
+                                        onClick={() => setLikesSort(likesSort === 'liked-desc' ? 'liked-asc' : 'liked-desc')}
+                                    >
+                                        Sort by When Liked {likesSort === 'liked-asc' ? '▴' : '▾'}
+                                    </span>
+                                </div>
                             </div>
-                            <div className="pp-likes-view-toggle">
-                                <span className="pp-likes-view-icon pp-likes-view-icon-active" />
-                                <span className="pp-likes-view-icon" />
-                            </div>
-                        </div>
+                        )}
 
-                        <div className="pp-likes-empty-box">
-                            <p className="pp-likes-empty-text">No {likesSubTab.toLowerCase()} yet</p>
-                        </div>
+                        {likesSubTab === 'Films' ? (
+                            visibleLikes.length === 0 ? (
+                                <div className="pp-likes-empty-box">
+                                    <p className="pp-likes-empty-text">
+                                        {likedShows.length === 0 ? 'No liked films yet' : 'Nothing matches these filters'}
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="pp-watchlist-poster-grid">
+                                    {visibleLikes.map(({ showId }) => {
+                                        const info = watchlistInfo[showId];
+                                        return (
+                                            <div key={showId} className="pp-watchlist-poster-item">
+                                                {info?.poster_path ? (
+                                                    <img
+                                                        src={`${POSTER_BASE}${info.poster_path}`}
+                                                        alt={info?.name || ''}
+                                                        className="pp-watchlist-poster"
+                                                        onClick={() => navigate(`/shows/${showId}`)}
+                                                    />
+                                                ) : (
+                                                    <div
+                                                        className="pp-watchlist-poster pp-watchlist-poster-placeholder"
+                                                        onClick={() => navigate(`/shows/${showId}`)}
+                                                    />
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )
+                        ) : (
+                            <div className="pp-likes-empty-box">
+                                <p className="pp-likes-empty-text">No {likesSubTab.toLowerCase()} yet</p>
+                            </div>
+                        )}
                     </div>
                 ) : activeTab === 'watchlist' ? (
                     <div className="pp-watchlist-solo">

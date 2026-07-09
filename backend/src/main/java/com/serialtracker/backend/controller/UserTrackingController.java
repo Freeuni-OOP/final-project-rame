@@ -30,17 +30,20 @@ public class UserTrackingController {
     private final UserRepository userRepository;
     private final RecommendationRepository recommendationRepository;
     private final ActivityRepository activityRepository;
+    private final ReviewLikeRepository reviewLikeRepository;
 
     public UserTrackingController(UserShowStatusRepository statusRepository,
                                   UserEpisodeStatusRepository episodeRepository,
                                   UserRepository userRepository,
                                   RecommendationRepository recommendationRepository,
-                                  ActivityRepository activityRepository) { // 🟢 ჩამატებულია
+                                  ActivityRepository activityRepository,
+                                  ReviewLikeRepository reviewLikeRepository) {
         this.statusRepository = statusRepository;
         this.episodeRepository = episodeRepository;
         this.userRepository = userRepository;
         this.recommendationRepository = recommendationRepository;
-        this.activityRepository = activityRepository; // 🟢 ჩამატებულია
+        this.activityRepository = activityRepository;
+        this.reviewLikeRepository = reviewLikeRepository;
     }
 
     @PostMapping("/show-status")
@@ -200,13 +203,53 @@ public class UserTrackingController {
         return ResponseEntity.ok(showIds);
     }
 
-    // Diary: ამ იუზერის ყველა დათარიღებული ჩანაწერი (ეპიზოდები + whole-show),
-    // watchDate-ით ახლიდან-ძველისკენ დალაგებული. title/poster front-end-ი TMDB-დან იღებს.
-    @GetMapping("/diary")
-    public ResponseEntity<?> getDiary(@RequestParam String username) {
+// Likes: ამ იუზერის მოწონებული (heart) შოუები – showId + rating (Likes tab-ის ფილტრებისთვის),
+    // ბოლო-პირველი (findLikedByUserId უკვე id DESC-ით აბრუნებს)
+    @GetMapping("/likes")
+    public ResponseEntity<?> getLikes(@RequestParam String username) {
         Long userId = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"))
                 .getId();
+
+        List<java.util.Map<String, Object>> liked = statusRepository.findLikedByUserId(userId)
+                .stream()
+                .map(s -> {
+                    java.util.Map<String, Object> m = new java.util.HashMap<>();
+                    m.put("showId", s.getShowId());
+                    m.put("rating", s.getRating()); // შეიძლება null იყოს
+                    return m;
+                })
+                .toList();
+
+        return ResponseEntity.ok(liked);
+    }
+
+    // Films count: ბოლომდე ნანახი (COMPLETED) შოუების რაოდენობა – პროფილის "Films" სტატისტიკა
+    @GetMapping("/films-count")
+    public ResponseEntity<?> getFilmsCount(@RequestParam String username) {
+        Long userId = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"))
+                .getId();
+
+        long count = statusRepository.countByUserIdAndStatus(userId, SeriesStatus.COMPLETED);
+        return ResponseEntity.ok(count);
+    }
+    // Diary: ამ იუზერის ყველა დათარიღებული ჩანაწერი (ეპიზოდები + whole-show),
+    // watchDate-ით ახლიდან-ძველისკენ დალაგებული. title/poster front-end-ი TMDB-დან იღებს.
+    @GetMapping("/diary")
+    public ResponseEntity<?> getDiary(@RequestParam String username,
+                                      @RequestParam(required = false) String viewer) {
+        Long userId = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"))
+                .getId();
+
+        // მნახველის ლაიქები (TYPE:id) — likedByMe-სთვის
+        java.util.Set<String> myLikedKeys = new java.util.HashSet<>();
+        if (viewer != null) {
+            userRepository.findByUsername(viewer).ifPresent(v ->
+                    reviewLikeRepository.findByLikerUserId(v.getId())
+                            .forEach(rl -> myLikedKeys.add(rl.getReviewType() + ":" + rl.getReviewId())));
+        }
 
         List<DiaryEntryResponse> entries = new ArrayList<>();
 
@@ -221,6 +264,7 @@ public class UserTrackingController {
             d.setRewatch(ep.isRewatch());
             d.setReview(ep.getReview());
             d.setWholeShow(false);
+            applyDiaryLikes(d, "EPISODE", ep.getId(), myLikedKeys);
             entries.add(d);
         }
 
@@ -235,11 +279,19 @@ public class UserTrackingController {
             d.setRewatch(s.isRewatch());
             d.setReview(s.getReview());
             d.setWholeShow(true);
+            applyDiaryLikes(d, "SHOW", s.getId(), myLikedKeys);
             entries.add(d);
         }
 
         entries.sort(Comparator.comparing(DiaryEntryResponse::getWatchDate).reversed());
         return ResponseEntity.ok(entries);
+    }
+
+    private void applyDiaryLikes(DiaryEntryResponse d, String type, Long reviewId, java.util.Set<String> myLikedKeys) {
+        d.setReviewId(reviewId);
+        d.setReviewType(type);
+        d.setLikeCount(reviewLikeRepository.countByReviewTypeAndReviewId(type, reviewId));
+        d.setLikedByMe(myLikedKeys.contains(type + ":" + reviewId));
     }
 
     @PostMapping("/toggle-favorite")

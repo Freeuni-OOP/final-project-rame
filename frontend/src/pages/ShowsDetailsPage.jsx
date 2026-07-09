@@ -240,6 +240,24 @@ function ShowsDetailsPage() {
     const friendReviews = reviews.filter(r => r.friend);
     const otherReviews = reviews.filter(r => !r.friend);
 
+    const handleReviewLike = (r) => {
+        if (!username || !r.reviewId) return;
+        fetch(`https://localhost:8443/api/reviews/like?username=${username}&reviewType=${r.reviewType}&reviewId=${r.reviewId}`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        })
+            .then(res => (res.ok ? res.json() : null))
+            .then(data => {
+                if (!data) return;
+                setReviews(prev => prev.map(x =>
+                    (x.reviewId === r.reviewId && x.reviewType === r.reviewType)
+                        ? { ...x, likeCount: data.likeCount, likedByMe: data.liked }
+                        : x
+                ));
+            })
+            .catch(err => console.error("Review like failed:", err));
+    };
+
     const renderReview = (r, i) => {
         const initial = r.username ? r.username.charAt(0).toUpperCase() : '?';
         const badge = r.seasonNumber != null && r.episodeNumber != null
@@ -248,6 +266,7 @@ function ShowsDetailsPage() {
         const goToProfile = () => {
             if (r.username) navigate(`/profile/${r.username}`);
         };
+        const canLike = !!username;
         return (
             <div key={i} className="review-item">
                 <div
@@ -276,6 +295,20 @@ function ShowsDetailsPage() {
                         {r.rewatch && <span className="review-rewatch">{'\u21bb'} rewatch</span>}
                     </div>
                     {r.review && <p className="review-text">{r.review}</p>}
+                </div>
+
+                <div className="review-like-box" title={r.likedByMe ? 'Unlike' : 'Like this review'}>
+                    <span
+                        className="review-like-heart"
+                        onClick={() => canLike && handleReviewLike(r)}
+                        style={{
+                            cursor: canLike ? 'pointer' : 'default',
+                            color: r.likedByMe ? '#e85d75' : '#5f758a'
+                        }}
+                    >
+                        {r.likedByMe ? '♥' : '♡'}
+                    </span>
+                    <span className="review-like-count">{r.likeCount || 0}</span>
                 </div>
             </div>
         );
