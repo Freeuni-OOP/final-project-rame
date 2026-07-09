@@ -238,6 +238,74 @@
     gap: 4px;
 }
 
+/* ---------- list card hover like button ---------- */
+.lp-card {
+    cursor: pointer;
+}
+
+.lp-card-like-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(10, 14, 20, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 4px;
+    color: #7c93a8;
+    font-size: 0.75rem;
+    padding: 3px 8px;
+    cursor: pointer;
+    margin-left: auto;
+    opacity: 0;
+    transition: opacity 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.lp-card:hover .lp-card-like-btn {
+    opacity: 1;
+}
+
+.lp-card-like-btn:hover {
+    color: #e85d75;
+    border-color: rgba(232, 93, 117, 0.45);
+}
+
+.lp-card-like-btn-active {
+    color: #e85d75 !important;
+    border-color: rgba(232, 93, 117, 0.5) !important;
+    opacity: 1 !important;
+}
+
+/* ---------- liked-row hover like button ---------- */
+.lp-row-like-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 4px;
+    color: #7c93a8;
+    font-size: 0.75rem;
+    padding: 2px 7px;
+    cursor: pointer;
+    margin-left: auto;
+    opacity: 0;
+    transition: opacity 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.lp-liked-row:hover .lp-row-like-btn {
+    opacity: 1;
+}
+
+.lp-row-like-btn:hover {
+    color: #e85d75;
+    border-color: rgba(232, 93, 117, 0.45);
+}
+
+.lp-row-like-btn-active {
+    color: #e85d75 !important;
+    border-color: rgba(232, 93, 117, 0.5) !important;
+    opacity: 1 !important;
+}
+
 /* ---------- recently liked (left col) ---------- */
 .lp-liked-list {
     display: flex;
@@ -281,6 +349,12 @@
     color: #7c93a8;
     font-size: 0.85rem;
     margin-top: 8px;
+}
+
+.lp-empty-note {
+    color: #5f758a;
+    font-size: 0.85rem;
+    padding: 12px 0;
 }
 
 /* ---------- crew picks (right col) ---------- */
