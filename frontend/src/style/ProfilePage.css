@@ -941,6 +941,65 @@
     margin: 0;
 }
 
+/* Likes → Lists: liked list cards with small poster strip */
+.pp-liked-lists {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.pp-liked-list-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.pp-liked-list-card:hover {
+    background: rgba(0, 180, 162, 0.08);
+    border-color: rgba(0, 180, 162, 0.3);
+}
+
+.pp-liked-list-posters {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.pp-liked-list-poster {
+    width: 44px;
+    height: 66px;
+    border-radius: 4px;
+    object-fit: cover;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    flex-shrink: 0;
+}
+
+.pp-liked-list-poster-ph {
+    background: linear-gradient(160deg, rgba(0, 180, 162, 0.3), rgba(91, 141, 239, 0.2));
+}
+
+.pp-liked-list-name {
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 1rem;
+    margin-bottom: 4px;
+}
+
+.pp-liked-list-meta {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    color: #7c93a8;
+    font-size: 0.82rem;
+}
+
+.pp-liked-list-likes {
+    color: #e85d75;
+}
+
 /* ---------- watchlist tab ---------- */
 .pp-watchlist-solo {
     width: 100%;

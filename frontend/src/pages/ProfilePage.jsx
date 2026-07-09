@@ -19,7 +19,7 @@ const FAVORITE_ACTORS_COUNT = 6;
 // genuinely empty (no fabricated rows) — just the filter chrome plus an
 // empty state, matching the real "no data yet" situation.
 const LIKES_FILTERS = ['Rating', 'Decade', 'Genre', 'Service', 'Sort by When Liked'];
-const LIKES_SUBTABS = ['TV Shows', 'Reviews', 'Lists'];
+const LIKES_SUBTABS = ['TV Shows', 'Lists'];
 
 // Watchlist is backed by the real "PLAN_TO_WATCH" show status (set from the
 // star icon on a show/details page). Backend already returns it newest-added
@@ -212,6 +212,8 @@ export default function ProfilePage() {
     const [watchlistInfo, setWatchlistInfo] = useState({});
     const [friendPosterIds, setFriendPosterIds] = useState({}); // username -> [showId,...] (Network tab-ის რეალური ფოტოებისთვის)
     const [likedShows, setLikedShows] = useState([]); // Likes tab — [{showId, rating}], ბოლო-პირველი
+    const [likedLists, setLikedLists] = useState([]); // Likes → Lists subtab — მოწონებული სიები
+    const [listPosterIds, setListPosterIds] = useState({}); // listId -> [showId,...] (პოსტერებისთვის)
     const [likesSort, setLikesSort] = useState('liked-desc'); // liked-desc|liked-asc|rating-desc|rating-asc
     const [likesDecade, setLikesDecade] = useState('');
     const [likesGenre, setLikesGenre] = useState('');
@@ -259,6 +261,7 @@ const loadAll = () => {
             fetch(`https://localhost:8443/api/tracking/activity?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`https://localhost:8443/api/tracking/likes?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`https://localhost:8443/api/tracking/films-count?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : 0)),
+            fetch(`https://localhost:8443/api/lists/liked?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
         ];
 
         // Private data (own profile only) — მოთხოვნები/რეკომენდაციები მხოლოდ საკუთარია
@@ -277,6 +280,7 @@ const loadAll = () => {
                 activityList = [], 
                 likedIds = [], 
                 filmsCountVal = 0,
+                likedListsData = [],
                 pendingList = [], 
                 sentlist = [], 
                 recsList = []
@@ -290,6 +294,9 @@ const loadAll = () => {
 
                 setLikedShows(likedIds || []);
                 (likedIds || []).forEach(it => ensureWatchlistShowInfo(it.showId));
+
+                setLikedLists(likedListsData || []);
+                (likedListsData || []).forEach(l => ensureListItems(l.id));
 
                 setDiaryEntries(diaryList || []);
                 (diaryList || []).forEach(e => ensureWatchlistShowInfo(e.showId));
@@ -335,6 +342,23 @@ const loadAll = () => {
             .catch(() => {});
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [token]);
+
+    // Likes → Lists: მოწონებული სიის items (showId-ები) — პოსტერების საჩვენებლად.
+    // /api/lists/liked items-ს არ აბრუნებს, ამიტომ თითო სიის detail-ს ცალკე ვიღებთ.
+    const requestedListItems = useRef(new Set());
+    const ensureListItems = useCallback((listId) => {
+        if (!listId || requestedListItems.current.has(listId)) return;
+        requestedListItems.current.add(listId);
+        fetch(`https://localhost:8443/api/lists/${listId}`, { headers: authHeaders })
+            .then(r => (r.ok ? r.json() : null))
+            .then(data => {
+                const ids = (data?.items || []).map(it => it.showId).slice(0, 5);
+                setListPosterIds(prev => ({ ...prev, [listId]: ids }));
+                ids.forEach(ensureWatchlistShowInfo);
+            })
+            .catch(() => {});
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [token, ensureWatchlistShowInfo]);
 
     // Network tab: მეგობრის ბოლოს ნანახი შოუების პოსტერები (Diary-დან, უახლესი პირველი)
     const requestedFriendPosters = useRef(new Set());
@@ -997,7 +1021,7 @@ const loadAll = () => {
                             ))}
                         </div>
 
-                        {likesSubTab === 'Films' && (
+                        {likesSubTab === 'TV Shows' && (
                             <div className="pp-likes-filters-row">
                                 <div className="pp-likes-filters">
                                     <span
@@ -1020,7 +1044,7 @@ const loadAll = () => {
                             </div>
                         )}
 
-                        {likesSubTab === 'Films' ? (
+                        {likesSubTab === 'TV Shows' ? (
                             visibleLikes.length === 0 ? (
                                 <div className="pp-likes-empty-box">
                                     <p className="pp-likes-empty-text">
@@ -1052,9 +1076,45 @@ const loadAll = () => {
                                 </div>
                             )
                         ) : (
-                            <div className="pp-likes-empty-box">
-                                <p className="pp-likes-empty-text">No {likesSubTab.toLowerCase()} yet</p>
-                            </div>
+                            likedLists.length === 0 ? (
+                                <div className="pp-likes-empty-box">
+                                    <p className="pp-likes-empty-text">No liked lists yet</p>
+                                </div>
+                            ) : (
+                                <div className="pp-liked-lists">
+                                    {likedLists.map((list) => {
+                                        const posterIds = listPosterIds[list.id] || [];
+                                        return (
+                                            <div
+                                                key={list.id}
+                                                className="pp-liked-list-card"
+                                                onClick={() => navigate(`/lists/${list.id}`)}
+                                            >
+                                                <div className="pp-liked-list-posters">
+                                                    {(posterIds.length ? posterIds : [null, null, null]).slice(0, 5).map((showId, i) => {
+                                                        const info = showId ? watchlistInfo[showId] : null;
+                                                        return info?.poster_path ? (
+                                                            <img
+                                                                key={i}
+                                                                src={`${POSTER_BASE}${info.poster_path}`}
+                                                                alt={info?.name || ''}
+                                                                className="pp-liked-list-poster"
+                                                            />
+                                                        ) : (
+                                                            <span key={i} className="pp-liked-list-poster pp-liked-list-poster-ph" />
+                                                        );
+                                                    })}
+                                                </div>
+                                                <div className="pp-liked-list-name">{list.name}</div>
+                                                <div className="pp-liked-list-meta">
+                                                    <span>by {list.ownerUsername}</span>
+                                                    <span className="pp-liked-list-likes">{'♥'} {list.likeCount}</span>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )
                         )}
                     </div>
                 ) : activeTab === 'watchlist' ? (
