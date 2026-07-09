@@ -244,9 +244,8 @@ export default function Header() {
                             </div>
                         </>
                     ) : (
-                        <div className="header-profile-wrapper" onClick={() => navigate('/login')}>
-                            <span className="header-username" style={{ color: '#5f758a' }}>Guest</span>
-                            <div className="header-avatar" style={{ backgroundColor: 'rgba(255,255,255,0.1)', color: '#5f758a' }}>?</div>
+                        <div className="header-profile-wrapper" onClick={() => navigate('/login')} style={{ cursor: 'pointer' }}>
+                            <span className="header-username" style={{ color: '#fff', fontWeight: 'bold' }}>Log in</span>
                         </div>
                     )}
                 </div>
