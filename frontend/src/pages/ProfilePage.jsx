@@ -537,7 +537,7 @@ const loadAll = () => {
 
                     <div className="pp-stats">
                         <div className="pp-stat-item">
-                            <span className="pp-stat-num">{PLACEHOLDER_FILMS_COUNT}</span>
+                            <span className="pp-stat-num">{loading ? '–' : filmsCount}</span>
                             <span className="pp-stat-label">TV Shows</span>
                         </div>
                         <div className="pp-stat-item">

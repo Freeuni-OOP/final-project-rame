@@ -597,46 +597,42 @@ export default function ListsPage() {
                             <span className="lp-kicker">Recently Liked</span>
                         </div>
                         <div className="lp-liked-list">
-                          {recentlyLiked.length === 0 ? (
-    <p className="lp-empty-note">
-        {username ? 'No liked lists yet — like a list to see it here.' : 'Log in to see your liked lists.'}
-    </p>
-) : recentlyLiked.map((item) => {
-    const posterItems = (itemsByListId[item.id] || []).slice(0, 5);
-    const rowLikeCount = likeCountOverride[item.id] ?? item.likeCount ?? 0;
-    return (
-        <div
-            key={item.id}
-            className="lp-liked-row"
-            style={{ cursor: 'pointer' }}
-            onClick={() => navigate(`/lists/${item.id}`)}
-        >
-            <RealPosterStrip
-                posterPaths={posterItems.map(pi => showInfoCache[pi.showId]?.poster_path).filter(Boolean)}
-                size="sm"
-            />
-            <div className="lp-liked-content">
-                <div className="lp-liked-title">{item.name}</div>
-                <div className="lp-liked-meta">
-                    <MiniAvatar name={item.ownerUsername} size={18} />
-                    <span className="lp-creator-name">{item.ownerUsername}</span>
-                    <span className="lp-stat">{(itemsByListId[item.id] || []).length} films</span>
-                    {username && (
-                        <button
-                            type="button"
-                            className={`lp-row-like-btn${likedSet.has(item.id) ? ' lp-row-like-btn-active' : ''}`}
-                            onClick={(e) => handleCardLike(item, e)}
-                            title={likedSet.has(item.id) ? 'Unlike this list' : 'Like this list'}
-                        >
-                            ♥{rowLikeCount > 0 ? ` ${rowLikeCount}` : ''}
-                        </button>
-                    )}
-                </div>
-                {item.description && <p className="lp-liked-desc">{item.description}</p>}
-            </div>
-        </div>
-    );
-})}
+                            {recentlyLiked.length === 0 ? (
+                                <p className="lp-empty-note">
+                                    {username ? 'No liked lists yet — like a list to see it here.' : 'Log in to see your liked lists.'}
+                                </p>
+                            ) : recentlyLiked.map((item) => {
+                                const posterItems = (itemsByListId[item.id] || []).slice(0, 5);
+                                const rowLikeCount = likeCountOverride[item.id] ?? item.likeCount ?? 0;
+                                return (
+                                    <div
+                                        key={item.id}
+                                        className="lp-liked-row"
+                                        style={{ cursor: 'pointer' }}
+                                        onClick={() => navigate(`/lists/${item.id}`)}
+                                    >
+                                        <RealPosterStrip
+                                            posterPaths={posterItems.map(pi => showInfoCache[pi.showId]?.poster_path).filter(Boolean)}
+                                            size="sm"
+                                        />
+                                        <div className="lp-liked-content">
+                                            <div className="lp-liked-title">{item.name}</div>
+                                            <div className="lp-liked-meta">
+                                                <MiniAvatar name={item.ownerUsername} size={18} />
+                                                <span className="lp-creator-name">{item.ownerUsername}</span>
+                                                <span className="lp-stat">{(itemsByListId[item.id] || []).length} films</span>
+                                                {username && (
+                                                    <button
+                                                        type="button"
+                                                        className={`lp-row-like-btn${likedSet.has(item.id) ? ' lp-row-like-btn-active' : ''}`}
+                                                        onClick={(e) => handleCardLike(item, e)}
+                                                        title={likedSet.has(item.id) ? 'Unlike this list' : 'Like this list'}
+                                                    >
+                                                        ♥{rowLikeCount > 0 ? ` ${rowLikeCount}` : ''}
+                                                    </button>
+                                                )}
+                                            </div>
+                                            {item.description && <p className="lp-liked-desc">{item.description}</p>}
                                         </div>
                                     </div>
                                 );
