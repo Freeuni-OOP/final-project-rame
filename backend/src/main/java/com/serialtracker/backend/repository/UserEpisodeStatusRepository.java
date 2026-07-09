@@ -14,6 +14,7 @@ public interface UserEpisodeStatusRepository extends JpaRepository<UserEpisodeSt
 
     boolean existsByUserIdAndShowIdAndSeasonNumberAndEpisodeNumber(Long userId, int showId, Integer seasonNumber, Integer episodeNumber);
     void deleteByUserIdAndShowId(Long userId, int showId);
+    List<UserEpisodeStatus> findByUserId(Long userId);
 
     List<UserEpisodeStatus> findByShowIdAndReviewIsNotNull(int showId);
 
