@@ -391,6 +391,8 @@ export default function ProfilePage() {
                 (likedIds || []).forEach(it => ensureWatchlistShowInfo(it.showId));
 
                 setLikedLists(likedListsData || []);
+                (likedListsData || []).forEach(l =>
+                    (l.items || []).forEach(it => ensureWatchlistShowInfo(it.showId)));
 
                 setDiaryEntries(diaryList || []);
                 (diaryList || []).forEach(e => ensureWatchlistShowInfo(e.showId));
@@ -1420,7 +1422,7 @@ export default function ProfilePage() {
                                 </div>
                             ) : (
                                 <div className="pp-watchlist-poster-grid">
-                                    {visibleLikes.map(({ showId }) => {
+                                    {visibleLikes.map(({ showId, rating }) => {
                                         const info = watchlistInfo[showId];
                                         return (
                                             <div key={showId} className="pp-watchlist-poster-item">
@@ -1436,6 +1438,9 @@ export default function ProfilePage() {
                                                         className="pp-watchlist-poster pp-watchlist-poster-placeholder"
                                                         onClick={() => navigate(`/shows/${showId}`)}
                                                     />
+                                                )}
+                                                {rating > 0 && (
+                                                    <span className="pp-likes-rating-badge">★ {rating}</span>
                                                 )}
                                             </div>
                                         );
@@ -1455,6 +1460,24 @@ export default function ProfilePage() {
                                             className="pp-liked-list-card"
                                             onClick={() => navigate(`/lists/${list.id}`)}
                                         >
+                                            <div className="pp-liked-list-posters">
+                                                {(list.items || []).slice(0, 4).map((it) => {
+                                                    const info = watchlistInfo[it.showId];
+                                                    return info?.poster_path ? (
+                                                        <img
+                                                            key={it.showId}
+                                                            src={`${POSTER_BASE}${info.poster_path}`}
+                                                            alt={info?.name || ''}
+                                                            className="pp-liked-list-poster"
+                                                        />
+                                                    ) : (
+                                                        <div key={it.showId} className="pp-liked-list-poster pp-liked-list-poster-empty" />
+                                                    );
+                                                })}
+                                                {(!list.items || list.items.length === 0) && (
+                                                    <div className="pp-liked-list-poster pp-liked-list-poster-empty" />
+                                                )}
+                                            </div>
                                             <div className="pp-liked-list-name">{list.name}</div>
                                             <div className="pp-liked-list-meta">
                                                 <span className="pp-liked-list-pill">{list.isPublic ? 'Public' : 'Private'}</span>

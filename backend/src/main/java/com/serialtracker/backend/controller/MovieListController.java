@@ -222,7 +222,14 @@ public class MovieListController {
                     MovieList list = movieListService.getList(like.getListId());
                     User owner = userRepository.findById(list.getOwnerId()).orElse(null);
 
-                    MovieListDto dto = owner != null ? MovieListDto.from(list, owner) : MovieListDto.from(list, "unknown");
+                    // items ჩავრთოთ, რომ პროფილზე სიის პოსტერები დაიხატოს
+                    List<MovieListItemDto> items = movieListService.getItems(list.getId()).stream()
+                            .map(MovieListItemDto::from)
+                            .toList();
+
+                    MovieListDto dto = owner != null
+                            ? MovieListDto.from(list, owner, items)
+                            : MovieListDto.from(list, "unknown", items);
                     dto.setLikeCount(likeRepository.countByListId(list.getId()));
                     dto.setLikedByMe(true); // რადგან ამ ენდპოინტიდან მიგვაქვს, ესე იგი იუზერს ნამდვილად დალაიქებული აქვს
 

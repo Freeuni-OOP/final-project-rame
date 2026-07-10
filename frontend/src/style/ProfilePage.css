@@ -1094,6 +1094,19 @@
     position: relative;
 }
 
+.pp-likes-rating-badge {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    background: rgba(15, 17, 21, 0.85);
+    color: #f59e0b;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 6px;
+    pointer-events: none;
+}
+
 .pp-watchlist-poster {
     width: 100%;
     aspect-ratio: 2 / 3;
@@ -1676,6 +1689,26 @@
 .pp-liked-list-card:hover {
     border-color: #00b4a2;
     transform: translateY(-2px);
+}
+
+.pp-liked-list-posters {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.pp-liked-list-poster {
+    flex: 0 0 62px;
+    width: 62px;
+    height: 93px;
+    aspect-ratio: 2 / 3;
+    border-radius: 6px;
+    object-fit: cover;
+    background: #24303c;
+}
+
+.pp-liked-list-poster-empty {
+    background: #24303c;
 }
 
 .pp-liked-list-name {
