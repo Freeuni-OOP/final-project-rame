@@ -208,7 +208,7 @@ function FeaturedListCard({ list, posterPaths, itemCount, onOpen, liked, likeCou
                         }}
                         title={liked ? 'Unlike this list' : 'Like this list'}
                     >
-                        ♥{likeCount > 0 ? ` ${likeCount}` : ''}
+                        ♥
                     </button>
                 )}
             </div>
