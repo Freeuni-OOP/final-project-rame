@@ -1,5 +1,6 @@
 package com.serialtracker.backend.controller;
 
+import com.serialtracker.backend.dto.FeedItemResponse;
 import com.serialtracker.backend.dto.ReviewResponse;
 import com.serialtracker.backend.service.ReviewService;
 import org.springframework.web.bind.annotation.*;
@@ -15,6 +16,27 @@ public class ReviewController {
 
     public ReviewController(ReviewService reviewService) {
         this.reviewService = reviewService;
+    }
+
+    // GET /api/reviews/feed?username=Niakoo&limit=30
+    // მთავარი გვერდის ლენტა — მეგობრების რივიუები/შეფასებები, ახლიდან ძველისკენ
+    @GetMapping("/feed")
+    public List<FeedItemResponse> getFriendsFeed(
+            @RequestParam String username,
+            @RequestParam(defaultValue = "30") int limit) {
+
+        return reviewService.getFriendsFeed(username, limit);
+    }
+
+    // GET /api/reviews/public?username=Niakoo&sort=popular|newest&limit=30
+    // ყველა იუზერის რივიუ — პოპულარული (ლაიქებით) ან უახლესი
+    @GetMapping("/public")
+    public List<FeedItemResponse> getPublicFeed(
+            @RequestParam(required = false) String username,
+            @RequestParam(defaultValue = "newest") String sort,
+            @RequestParam(defaultValue = "30") int limit) {
+
+        return reviewService.getPublicFeed(username, sort, limit);
     }
 
     // GET /api/reviews/{showId}?username=Niakoo&season=1&episode=3

@@ -2,6 +2,8 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import LoginPage from './pages/LoginPage.jsx';
 import Register from './pages/RegisterPage.jsx';
 import ShowsPage from './pages/ShowsPage.jsx';
+import HomePage from './pages/HomePage.jsx';
+import ReviewsPage from './pages/ReviewsPage.jsx';
 import ShowsDetailsPage from "./pages/ShowsDetailsPage.jsx";
 import ListsPage from "./pages/ListsPage.jsx";
 import ListDetailPage from "./pages/ListDetailPage.jsx";
@@ -19,7 +21,8 @@ function App() {
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/shows" element={<ShowsPage />} />
-                <Route path="/" element={<ShowsPage />} />
+                <Route path="/" element={<HomePage />} />
+                <Route path="/reviews" element={<ReviewsPage />} />
                 <Route path="/shows/:id" element={<ShowsDetailsPage />} />
                 <Route path="/lists" element={<ListsPage />} />
                 <Route path="/lists/all/:type" element={<AllListsPage />} />

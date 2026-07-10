@@ -29,4 +29,16 @@ public interface UserShowStatusRepository extends JpaRepository<UserShowStatus, 
     List<UserShowStatus> findLikedByUserId(@org.springframework.data.repository.query.Param("userId") Long userId);
     // Films count: ბოლომდე ნანახი (COMPLETED) შოუების რაოდენობა
     long countByUserIdAndStatus(Long userId, SeriesStatus status);
+
+    // Feed: მოცემული იუზერების whole-show ჩანაწერები, სადაც რივიუ ან რეიტინგია
+    @org.springframework.data.jpa.repository.Query(
+            "SELECT s FROM UserShowStatus s WHERE s.userId IN :userIds " +
+                    "AND (s.review IS NOT NULL OR s.rating IS NOT NULL)")
+    List<UserShowStatus> findFeedEntriesByUserIds(
+            @org.springframework.data.repository.query.Param("userIds") java.util.Collection<Long> userIds);
+
+    // Public feed: ყველა იუზერის whole-show ჩანაწერი, სადაც რივიუ ან რეიტინგია
+    @org.springframework.data.jpa.repository.Query(
+            "SELECT s FROM UserShowStatus s WHERE s.review IS NOT NULL OR s.rating IS NOT NULL")
+    List<UserShowStatus> findAllReviewed();
 }
