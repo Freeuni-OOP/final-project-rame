@@ -1,0 +1,267 @@
+.home-page {
+    min-height: 100vh;
+    background: #0f1115;
+    color: #ffffff;
+}
+
+/* ---------- Friends strip (horizontal, scrollable) ---------- */
+
+.friends-strip {
+    padding: 26px 20px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background: linear-gradient(180deg, #12161c 0%, #0f1115 100%);
+}
+
+.friends-strip-head {
+    max-width: 1200px;
+    margin: 0 auto 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.friends-strip-title {
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    color: #ffffff;
+    margin: 0;
+}
+
+.friends-strip-more {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: #d5dee6;
+    padding: 7px 16px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.friends-strip-more:hover {
+    border-color: #00b09b;
+    color: #00b09b;
+}
+
+.friends-scroll {
+    display: flex;
+    gap: 16px;
+    overflow-x: auto;
+    padding: 4px 4px 14px;
+    max-width: 1200px;
+    margin: 0 auto;
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
+    scrollbar-color: #2d3d4d transparent;
+}
+
+.friends-scroll::-webkit-scrollbar {
+    height: 8px;
+}
+
+.friends-scroll::-webkit-scrollbar-thumb {
+    background: #2d3d4d;
+    border-radius: 4px;
+}
+
+.friends-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+/* ---------- Card ---------- */
+
+.friend-card {
+    flex: 0 0 268px;
+    width: 268px;
+    display: flex;
+    flex-direction: column;
+    background: #14181e;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    padding: 14px;
+    scroll-snap-align: start;
+    transition: border-color 0.15s ease;
+}
+
+.friend-card:hover {
+    border-color: rgba(255, 255, 255, 0.14);
+}
+
+.friend-card-head {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-bottom: 12px;
+}
+
+.friend-avatar {
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #0f1115;
+    cursor: pointer;
+}
+
+.friend-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.friend-author {
+    font-weight: 600;
+    font-size: 0.92rem;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.friend-author:hover {
+    color: #00b09b;
+}
+
+.friend-card-body {
+    display: flex;
+    gap: 12px;
+}
+
+.friend-poster {
+    flex: 0 0 62px;
+    width: 62px;
+    height: 93px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #1c252f;
+    cursor: pointer;
+}
+
+.friend-poster img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.friend-poster-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    font-size: 0.65rem;
+    color: #5f758a;
+    text-align: center;
+    padding: 0 4px;
+}
+
+.friend-card-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.friend-show-name {
+    font-size: 0.9rem;
+    font-weight: 500;
+    line-height: 1.35;
+    cursor: pointer;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.friend-show-name:hover {
+    color: #00b09b;
+}
+
+.friend-tags {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.feed-stars {
+    color: #f59e0b;
+    letter-spacing: 1px;
+    font-size: 0.85rem;
+}
+
+.feed-heart {
+    color: #e85d75;
+}
+
+.feed-badge {
+    background: #1c252f;
+    color: #8a9bab;
+    border-radius: 5px;
+    padding: 1px 7px;
+    font-size: 0.72rem;
+}
+
+.friend-review {
+    margin: 12px 0 0;
+    line-height: 1.55;
+    color: #d5dee6;
+    font-size: 0.86rem;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.friend-card-foot {
+    margin-top: auto;
+    padding-top: 12px;
+}
+
+.feed-like-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 4px 13px;
+    color: #5f758a;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.feed-like-button:hover {
+    border-color: rgba(232, 93, 117, 0.5);
+    color: #e85d75;
+}
+
+.feed-like-button.liked {
+    color: #e85d75;
+    border-color: rgba(232, 93, 117, 0.35);
+}
+
+.feed-like-heart {
+    font-size: 1rem;
+    line-height: 1;
+}
+
+@media (max-width: 560px) {
+    .friend-card {
+        flex: 0 0 230px;
+        width: 230px;
+    }
+}
