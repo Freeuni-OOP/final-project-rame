@@ -10,6 +10,8 @@ public class ReviewResponse {
     private Integer seasonNumber;   // null თუ Whole Show რივიუა
     private Integer episodeNumber;  // null თუ Whole Show რივიუა
     private boolean friend;         // true თუ ეს მიმდინარე იუზერის მეგობარია
+    private String profilePicture; // ინახავს იუზერის ავატარს Base64 ფორმატში
+
 
     // Review-likes
     private Long reviewId;           // წყაროს row id (episode ან show სტატუსში)
@@ -39,6 +41,9 @@ public class ReviewResponse {
 
     public Integer getEpisodeNumber() { return episodeNumber; }
     public void setEpisodeNumber(Integer episodeNumber) { this.episodeNumber = episodeNumber; }
+
+    public String getProfilePicture() { return profilePicture; }
+    public void setProfilePicture(String profilePicture) { this.profilePicture = profilePicture; }
 
     public boolean isFriend() { return friend; }
     public void setFriend(boolean friend) { this.friend = friend; }

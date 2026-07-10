@@ -28,8 +28,12 @@ const LISTS_BASE_URL = 'https://localhost:8443/api/lists';
 const SHOWS_BASE_URL = 'https://localhost:8443/api/shows';
 const POSTER_BASE = 'https://image.tmdb.org/t/p/w300';
 
-// RECENTLY_LIKED is now loaded from the real backend (GET /api/lists/liked).
-// The placeholder array was removed.
+const RECENTLY_LIKED = [
+    { title: "2000's", creator: 'gabi', films: 31, likes: 480, comments: 2, desc: "iconic 2000's girly films" },
+    { title: 'favorites', creator: 'lisraa', films: 30, likes: 4 },
+    { title: 'Giant Insects & Naked Ladies!', creator: 'Funktual', films: 26, likes: 1 },
+    { title: "2000's chick flicks", creator: 'paden19', films: 150, likes: '2.5K', comments: 7, desc: "literally every 2000's chick flick you can think of and ones you don't even know about" },
+];
 
 export const CREW_PICKS = [
     {
@@ -105,14 +109,6 @@ function HeartIcon() {
     );
 }
 
-function CommentIcon() {
-    return (
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H9l-5 4V5a1 1 0 0 1 1-1z" />
-        </svg>
-    );
-}
-
 function PosterStrip({ size = 'lg', count = 5 }) {
     return (
         <div className={`lp-poster-strip lp-poster-strip-${size}`}>
@@ -123,9 +119,6 @@ function PosterStrip({ size = 'lg', count = 5 }) {
     );
 }
 
-// Like PosterStrip, but renders real TMDB poster images when we have them
-// (used for "My Lists", since those are backed by real shows). Falls back
-// to the plain gradient placeholder for slots we don't have a poster for yet.
 function RealPosterStrip({ posterPaths = [], size = 'lg' }) {
     const slots = posterPaths.length > 0 ? posterPaths.slice(0, 5) : [null];
     return (
@@ -146,10 +139,6 @@ function RealPosterStrip({ posterPaths = [], size = 'lg' }) {
     );
 }
 
-// Collapsed "look" of a list - matches the Featured/Popular card style
-// (poster strip + title + meta). Clicking it navigates to the full list page.
-// No description here (kept on the full page instead) and no delete button
-// (that lives on the edit page now) - this card is purely a link.
 function MyListCard({ list, posterPaths, itemCount, onOpen }) {
     return (
         <div className="lp-card lp-my-list-card-v2" onClick={() => onOpen(list.id)}>
@@ -163,17 +152,48 @@ function MyListCard({ list, posterPaths, itemCount, onOpen }) {
     );
 }
 
-// Real-data version of ListCard, used for "Featured Lists" and "Popular This Week".
-// Shows who made it, how many shows are in it, and a ♥ like button on hover.
+// ჩასწორდა დეკლარაცია: დაემატა გამოტოვებული პარამეტრები პროპსებში
 function FeaturedListCard({ list, posterPaths, itemCount, onOpen, liked, likeCount, onLike, showLike }) {
+    const creator = list.ownerUsername || 'unknown';
+    const initial = creator.charAt(0).toUpperCase();
+    const hasAvatar = !!list.ownerProfilePicture;
+    const avatarSrc = hasAvatar ? `data:image/jpeg;base64,${list.ownerProfilePicture}` : null;
+
     return (
-        <div className="lp-card" onClick={() => onOpen(list.id)}>
-            <RealPosterStrip posterPaths={posterPaths} size="lg" />
+        <div className="lp-card" onClick={() => onOpen(list.id)} style={{ cursor: 'pointer' }}>
+            <RealPosterStrip posterPaths={posterPaths} size="card" />
             <div className="lp-card-title">{list.name}</div>
-            <div className="lp-card-meta">
-                <MiniAvatar name={list.ownerUsername} />
-                <span>
-                    Created by <span className="lp-creator-name">{list.ownerUsername}</span>
+            <div className="lp-card-meta" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {hasAvatar ? (
+                        <img
+                            src={avatarSrc}
+                            alt={creator}
+                            style={{ width: '18px', height: '18px', borderRadius: '50%', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)' }}
+                        />
+                    ) : (
+                        <div
+                            className="lp-avatar"
+                            style={{
+                                width: '18px',
+                                height: '18px',
+                                backgroundColor: colorForName(creator),
+                                fontSize: '9px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: '50%',
+                                color: '#fff',
+                                fontWeight: 'bold'
+                            }}
+                        >
+                            {initial}
+                        </div>
+                    )}
+                    <span className="lp-creator-name" style={{ fontSize: '12px', color: '#cbd5e1' }}>{creator}</span>
+                </div>
+                <span className="lp-stat" style={{ fontSize: '12px', color: '#9ab3c8' }}>
+                    {itemCount} {itemCount === 1 ? 'show' : 'shows'}
                 </span>
             </div>
             <div className="lp-card-stats">
@@ -182,7 +202,10 @@ function FeaturedListCard({ list, posterPaths, itemCount, onOpen, liked, likeCou
                     <button
                         type="button"
                         className={`lp-card-like-btn${liked ? ' lp-card-like-btn-active' : ''}`}
-                        onClick={onLike}
+                        onClick={(e) => {
+                            e.stopPropagation(); // ხელს უშლის ბარათზე დაჭერის ივენთის გააქტიურებას
+                            onLike(e);
+                        }}
                         title={liked ? 'Unlike this list' : 'Like this list'}
                     >
                         ♥{likeCount > 0 ? ` ${likeCount}` : ''}
@@ -208,19 +231,12 @@ export default function ListsPage() {
     const [popularLists, setPopularLists] = useState([]);
     const [popularLoading, setPopularLoading] = useState(true);
 
-    const [recentlyLiked, setRecentlyLiked] = useState([]);
-    // local overrides for like counts after optimistic toggles
-    const [likeCountOverride, setLikeCountOverride] = useState({});
-
-    // showId -> { name, poster_path }, filled in lazily as we discover which
-    // shows are in which lists (the list/item backend only stores TMDB ids,
-    // so we look the real title/poster up from the shows API once per id).
     const [showInfoCache, setShowInfoCache] = useState({});
     const requestedShowIds = useRef(new Set());
 
-    // show title -> poster_path, for Crew Picks (those aren't backed by real
-    // list items, just hardcoded show titles, so we resolve posters by
-    // searching TMDB TV search for each title instead of by id).
+    const [recentlyLiked, setRecentlyLiked] = useState([]);
+    const [likeCountOverride, setLikeCountOverride] = useState({});
+
     const [crewPosterCache, setCrewPosterCache] = useState({});
     const requestedCrewTitles = useRef(new Set());
 
@@ -242,8 +258,6 @@ export default function ListsPage() {
     const username = decodedToken?.sub;
     const authHeaders = { Authorization: `Bearer ${token}` };
 
-    // Looks up a show's real title/poster from the shows API, once per id,
-    // and caches it. Used for the "My Lists" poster strips.
     const ensureShowInfo = useCallback((showId) => {
         if (!showId || requestedShowIds.current.has(showId)) return;
         requestedShowIds.current.add(showId);
@@ -259,11 +273,8 @@ export default function ListsPage() {
                 }));
             })
             .catch(() => {});
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [token]);
 
-    // Looks up a poster for a Crew Pick show title via TMDB TV search, once
-    // per title, and caches it. Picks the first search result's poster.
     const ensureCrewPoster = useCallback((title) => {
         if (!title || requestedCrewTitles.current.has(title)) return;
         requestedCrewTitles.current.add(title);
@@ -274,7 +285,6 @@ export default function ListsPage() {
                 setCrewPosterCache(prev => ({ ...prev, [title]: poster }));
             })
             .catch(() => {});
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [token]);
 
     useEffect(() => {
@@ -289,7 +299,6 @@ export default function ListsPage() {
                 setItemsByListId(prev => ({ ...prev, [listId]: items }));
                 items.forEach(item => ensureShowInfo(item.showId));
             });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [token, ensureShowInfo]);
 
     const loadLists = useCallback(() => {
@@ -304,22 +313,16 @@ export default function ListsPage() {
             .then(data => {
                 const ls = data || [];
                 setLists(ls);
-                // Pull items for every list up front so the card grid can
-                // show real poster thumbnails immediately, not just once a
-                // card is expanded.
                 ls.forEach(l => loadItemsFor(l.id));
             })
             .catch(() => setError('Could not load your lists.'))
             .finally(() => setLoading(false));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [username]);
+    }, [username, loadItemsFor, token]);
 
     useEffect(() => {
         loadLists();
     }, [loadLists]);
 
-    // Featured Lists - newest public lists from any user. Public endpoint,
-    // so this loads even when logged out.
     const loadFeaturedLists = useCallback(() => {
         setFeaturedLoading(true);
         fetch(`${LISTS_BASE_URL}/public`, { headers: authHeaders })
@@ -331,16 +334,12 @@ export default function ListsPage() {
             })
             .catch(() => setFeaturedLists([]))
             .finally(() => setFeaturedLoading(false));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [token, loadItemsFor]);
 
     useEffect(() => {
         loadFeaturedLists();
     }, [loadFeaturedLists]);
 
-    // Popular This Week - public lists with the most shows in them. There's
-    // no likes/view-tracking system yet, so this is "biggest", not actually
-    // weekly or vote-based - good enough as a stand-in for now.
     const loadPopularLists = useCallback(() => {
         setPopularLoading(true);
         fetch(`${LISTS_BASE_URL}/public/popular`, { headers: authHeaders })
@@ -352,15 +351,12 @@ export default function ListsPage() {
             })
             .catch(() => setPopularLists([]))
             .finally(() => setPopularLoading(false));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [token, loadItemsFor]);
 
     useEffect(() => {
         loadPopularLists();
     }, [loadPopularLists]);
 
-    // Recently Liked — lists the current user has liked, newest-liked-first.
-    // Only fetches when logged in (no username = no liked lists to show).
     useEffect(() => {
         if (!username) return;
         fetch(`${LISTS_BASE_URL}/liked?username=${username}`, { headers: authHeaders })
@@ -371,8 +367,7 @@ export default function ListsPage() {
                 rl.forEach(l => loadItemsFor(l.id));
             })
             .catch(() => setRecentlyLiked([]));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [username]);
+    }, [username, loadItemsFor, token]);
 
     const handleCreateList = () => {
         if (!username) return;
@@ -394,14 +389,11 @@ export default function ListsPage() {
                 setNewListDescription('');
                 setNewListPublic(true);
                 setShowCreateForm(false);
-                // Jump straight to the edit page for the new list, so you can
-                // immediately add shows etc. rather than landing back here.
                 navigate(`/lists/${created.id}/edit`);
             })
             .catch((msg) => setFormError(typeof msg === 'string' ? msg : 'Could not create list.'));
     };
 
-    // Set of list IDs the current user has liked (derived from recentlyLiked)
     const likedSet = new Set(recentlyLiked.map(l => l.id));
 
     const handleCardLike = (list, e) => {
@@ -597,22 +589,14 @@ export default function ListsPage() {
                             <span className="lp-kicker">Recently Liked</span>
                         </div>
                         <div className="lp-liked-list">
-                            {recentlyLiked.length === 0 ? (
-                                <p className="lp-empty-note">
-                                    {username ? 'No liked lists yet — like a list to see it here.' : 'Log in to see your liked lists.'}
-                                </p>
-                            ) : recentlyLiked.map((item) => {
-                                const posterItems = (itemsByListId[item.id] || []).slice(0, 5);
-                                const rowLikeCount = likeCountOverride[item.id] ?? item.likeCount ?? 0;
-                                return (
-                                    <div
-                                        key={item.id}
-                                        className="lp-liked-row"
-                                        style={{ cursor: 'pointer' }}
-                                        onClick={() => navigate(`/lists/${item.id}`)}
-                                    >
+                            {/* 🟢 თუ იუზერი შესულია და აქვს დალაიქებული სიები */}
+                            {username && recentlyLiked.length > 0 ? (
+                                recentlyLiked.map((item, i) => (
+                                    <div key={i} className="lp-liked-row">
                                         <RealPosterStrip
-                                            posterPaths={posterItems.map(pi => showInfoCache[pi.showId]?.poster_path).filter(Boolean)}
+                                            posterPaths={(itemsByListId[item.id] || [])
+                                                .map(item => showInfoCache[item.showId]?.poster_path)
+                                                .filter(Boolean)}
                                             size="sm"
                                         />
                                         <div className="lp-liked-content">
@@ -620,23 +604,25 @@ export default function ListsPage() {
                                             <div className="lp-liked-meta">
                                                 <MiniAvatar name={item.ownerUsername} size={18} />
                                                 <span className="lp-creator-name">{item.ownerUsername}</span>
-                                                <span className="lp-stat">{(itemsByListId[item.id] || []).length} films</span>
-                                                {username && (
-                                                    <button
-                                                        type="button"
-                                                        className={`lp-row-like-btn${likedSet.has(item.id) ? ' lp-row-like-btn-active' : ''}`}
-                                                        onClick={(e) => handleCardLike(item, e)}
-                                                        title={likedSet.has(item.id) ? 'Unlike this list' : 'Like this list'}
-                                                    >
-                                                        ♥{rowLikeCount > 0 ? ` ${rowLikeCount}` : ''}
-                                                    </button>
-                                                )}
+                                                <span className="lp-stat">
+                            {(itemsByListId[item.id]?.length || 0)} shows
+                        </span>
+                                                <span className="lp-stat">
+                            <HeartIcon /> {item.likeCount ?? 0}
+                        </span>
                                             </div>
-                                            {item.description && <p className="lp-liked-desc">{item.description}</p>}
+                                            {item.description && (
+                                                <p className="lp-liked-desc">{item.description}</p>
+                                            )}
                                         </div>
                                     </div>
-                                );
-                            })}
+                                ))
+                            ) : (
+                                /* 🟢 თუ არაფერი აქვს დალაიქებული ან იუზერი საერთოდ არ არის ავტორიზებული */
+                                <p className="lp-section-empty" style={{ padding: '20px 0', color: '#64748b' }}>
+                                    {username ? "No liked lists yet." : "Log in to see your liked lists."}
+                                </p>
+                            )}
                         </div>
                     </section>
 
@@ -670,7 +656,6 @@ export default function ListsPage() {
                         </div>
                     </section>
                 </div>
-
             </main>
         </div>
     );

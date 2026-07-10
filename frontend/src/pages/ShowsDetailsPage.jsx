@@ -258,6 +258,12 @@ function ShowsDetailsPage() {
             .catch(err => console.error("Review like failed:", err));
     };
 
+    const getAvatarColor = (name) => {
+        if (!name) return '#00b4a2';
+        const colors = ['#00b4a2', '#e85d75', '#f2b134', '#5b8def'];
+        return colors[name.charCodeAt(0) % colors.length];
+    };
+
     const renderReview = (r, i) => {
         const initial = r.username ? r.username.charAt(0).toUpperCase() : '?';
         const badge = r.seasonNumber != null && r.episodeNumber != null
@@ -267,26 +273,49 @@ function ShowsDetailsPage() {
             if (r.username) navigate(`/profile/${r.username}`);
         };
         const canLike = !!username;
+
+        // 🟢 ვამოწმებთ, მოყვება თუ არა რევიუს იუზერის ფოტო ბექენდიდან
+        // (თუ ველის სახელი განსხვავებულია, მაგ. userProfilePicture, ჩაანაცვლე r.profilePicture-ის ადგილას)
+        const hasAvatar = r.profilePicture || r.userProfilePicture;
+        const avatarSrc = hasAvatar ? `data:image/jpeg;base64,${r.profilePicture || r.userProfilePicture}` : null;
+
         return (
             <div key={i} className="review-item">
+                {/* 🟢 განახლებული ავატარის ბლოკი */}
                 <div
                     className="review-avatar"
                     onClick={goToProfile}
-                    style={{ cursor: 'pointer' }}
+                    style={{
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        overflow: 'hidden',
+                        backgroundColor: hasAvatar ? 'transparent' : getAvatarColor(r.username) // თუ ფოტო აქვს, ფონი ქრება
+                    }}
                     title={`View ${r.username}'s profile`}
                 >
-                    {initial}
+                    {hasAvatar ? (
+                        <img
+                            src={avatarSrc}
+                            alt={r.username}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                    ) : (
+                        initial
+                    )}
                 </div>
+
                 <div className="review-body">
                     <div className="review-header">
-                        <span
-                            className="review-author"
-                            onClick={goToProfile}
-                            style={{ cursor: 'pointer' }}
-                            title={`View ${r.username}'s profile`}
-                        >
-                            {r.username}
-                        </span>
+                    <span
+                        className="review-author"
+                        onClick={goToProfile}
+                        style={{ cursor: 'pointer' }}
+                        title={`View ${r.username}'s profile`}
+                    >
+                        {r.username}
+                    </span>
                         {r.rating != null && r.rating > 0 && (
                             <span className="review-stars">{'\u2605'.repeat(r.rating)}</span>
                         )}
@@ -298,16 +327,16 @@ function ShowsDetailsPage() {
                 </div>
 
                 <div className="review-like-box" title={r.likedByMe ? 'Unlike' : 'Like this review'}>
-                    <span
-                        className="review-like-heart"
-                        onClick={() => canLike && handleReviewLike(r)}
-                        style={{
-                            cursor: canLike ? 'pointer' : 'default',
-                            color: r.likedByMe ? '#e85d75' : '#5f758a'
-                        }}
-                    >
-                        {r.likedByMe ? '♥' : '♡'}
-                    </span>
+                <span
+                    className="review-like-heart"
+                    onClick={() => canLike && handleReviewLike(r)}
+                    style={{
+                        cursor: canLike ? 'pointer' : 'default',
+                        color: r.likedByMe ? '#e85d75' : '#5f758a'
+                    }}
+                >
+                    {r.likedByMe ? '♥' : '♡'}
+                </span>
                     <span className="review-like-count">{r.likeCount || 0}</span>
                 </div>
             </div>

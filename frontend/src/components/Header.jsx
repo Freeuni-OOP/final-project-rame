@@ -13,6 +13,9 @@ export default function Header() {
     const [recommendations, setRecommendations] = useState([]);
     const [isBellOpen, setIsBellOpen] = useState(false);
     const bellRef = useRef(null);
+    const savedAvatar = localStorage.getItem('userAvatar');
+    const [currentAvatar, setCurrentAvatar] = useState(localStorage.getItem('userAvatar'));
+
 
     useEffect(() => {
         const params = new URLSearchParams(location.search);
@@ -65,6 +68,27 @@ export default function Header() {
         const interval = setInterval(fetchUnreadCount, 15000);
         return () => clearInterval(interval);
     }, [username, token]);
+
+    useEffect(() => {
+        if (!username || !token) return;
+
+        // 🟢 ვითხოვთ იუზერის უახლეს მონაცემებს ბექენდიდან
+        fetch(`https://localhost:8443/api/auth/user/${username}`, {
+            headers: { Authorization: `Bearer ${token}` }
+        })
+            .then(res => res.ok ? res.json() : null)
+            .then(user => {
+                if (user && user.profilePicture) {
+                    const base64Image = `data:image/jpeg;base64,${user.profilePicture}`;
+                    localStorage.setItem('userAvatar', base64Image);
+                    setCurrentAvatar(base64Image); // მომენტალურად ანახლებს ჰედერში
+                } else {
+                    localStorage.removeItem('userAvatar');
+                    setCurrentAvatar(null);
+                }
+            })
+            .catch(err => console.error("Error updating header avatar:", err));
+    }, [username, token, location.pathname]); // 👈 location.pathname უზრუნველყოფს გვერდის შეცვლისას განახლებას
 
     useEffect(() => {
         function handleClickOutside(event) {
@@ -204,9 +228,20 @@ export default function Header() {
 
                             <div className="header-profile-wrapper" onClick={() => navigate('/profile')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <span className="header-username" style={{ color: '#fff', fontWeight: 'bold' }}>{username}</span>
-                                <div className="header-avatar" style={{ backgroundColor: getAvatarColor(username), width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 'bold', fontSize: '14px' }}>
-                                    {username.charAt(0).toUpperCase()}
-                                </div>
+
+                                {currentAvatar ? (
+                                    /* 🟢 თუ ფოტო არსებობს, ვხატავთ მას */
+                                    <img
+                                        src={currentAvatar}
+                                        alt="Profile"
+                                        style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)' }}
+                                    />
+                                ) : (
+                                    /* 🔵 თუ ფოტო არ არის, რჩება ძველი ასო */
+                                    <div className="header-avatar" style={{ backgroundColor: getAvatarColor(username), width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 'bold', fontSize: '14px' }}>
+                                        {username ? username.charAt(0).toUpperCase() : '?'}
+                                    </div>
+                                )}
                             </div>
 
                             {/* 🟢 ახალი ლოგაუტის ღილაკი პროფილის გვერდით */}
