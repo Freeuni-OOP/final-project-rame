@@ -25,9 +25,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            response.setStatus(HttpServletResponse.SC_OK);
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         try {
             String jwt = parseJwt(request);
 
+            System.out.println("REQUEST METHOD: " + request.getMethod());
             System.out.println("JWT: " + jwt);
             System.out.println("Valid: " + (jwt != null && jwtUtils.validateJwtToken(jwt)));
             if (jwt != null && jwtUtils.validateJwtToken(jwt)) {

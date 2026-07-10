@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import jakarta.transaction.Transactional;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -234,8 +235,9 @@ public class UserTrackingController {
         long count = statusRepository.countByUserIdAndStatus(userId, SeriesStatus.COMPLETED);
         return ResponseEntity.ok(count);
     }
-    // Diary: ამ იუზერის ყველა დათარიღებული ჩანაწერი (ეპიზოდები + whole-show),
-    // watchDate-ით ახლიდან-ძველისკენ დალაგებული. title/poster front-end-ი TMDB-დან იღებს.
+
+    // Diary: ამ იუზერის ყველა ჩანაწერი (ეპიზოდები + whole-show),
+    // watchDate-ით (ან დღევანდელი თარიღით, თუ watchDate null-ია) ახლიდან-ძველისკენ დალაგებული.
     @GetMapping("/diary")
     public ResponseEntity<?> getDiary(@RequestParam String username,
                                       @RequestParam(required = false) String viewer) {
@@ -243,7 +245,7 @@ public class UserTrackingController {
                 .orElseThrow(() -> new RuntimeException("User not found"))
                 .getId();
 
-        // მნახველის ლაიქები (TYPE:id) — likedByMe-სთვის
+        // მნახველის ლაიქები (TYPE:id)
         java.util.Set<String> myLikedKeys = new java.util.HashSet<>();
         if (viewer != null) {
             userRepository.findByUsername(viewer).ifPresent(v ->
@@ -253,36 +255,33 @@ public class UserTrackingController {
 
         List<DiaryEntryResponse> entries = new ArrayList<>();
 
-        for (UserEpisodeStatus ep : episodeRepository.findByUserIdAndWatchDateIsNotNull(userId)) {
-            DiaryEntryResponse d = new DiaryEntryResponse();
-            d.setShowId(ep.getShowId());
-            d.setSeasonNumber(ep.getSeasonNumber());
-            d.setEpisodeNumber(ep.getEpisodeNumber());
-            d.setWatchDate(ep.getWatchDate());
-            d.setRating(ep.getRating());
-            d.setLiked(ep.isLiked());
-            d.setRewatch(ep.isRewatch());
-            d.setReview(ep.getReview());
-            d.setWholeShow(false);
-            applyDiaryLikes(d, "EPISODE", ep.getId(), myLikedKeys);
-            entries.add(d);
+        // 🟢 ვიღებთ ყველა შოუს სტატუსს ამ იუზერისთვის
+        for (UserShowStatus s : statusRepository.findByUserId(userId)) {
+            // დღიურში ვუშვებთ მხოლოდ იმ შოუებს, რომლებსაც აქვთ რაიმე სტატუსი (COMPLETED, WATCHING, PLAN_TO_WATCH, DROPPED)
+            if (s.getStatus() != null) {
+                DiaryEntryResponse d = new DiaryEntryResponse();
+                d.setShowId(s.getShowId());
+                d.setSeasonNumber(null);
+                d.setEpisodeNumber(null);
+
+                // თუ თარიღი არ უწერია, დღიურისთვის ვიყენებთ დღევანდელ დღეს (სორტირებისთვის)
+                d.setWatchDate(s.getWatchDate() != null ? s.getWatchDate() : LocalDate.now());
+
+                d.setRating(s.getRating());
+                d.setLiked(s.isFavorite());
+                d.setRewatch(s.isRewatch());
+                d.setReview(s.getReview());
+                d.setWholeShow(true);
+
+                // 🟢 გადავცემთ სტატუსს ფრონტენდს (მაგ. "WATCHING", "COMPLETED" და ა.შ.)
+                d.setStatus(s.getStatus().toString());
+
+                applyDiaryLikes(d, "SHOW", s.getId(), myLikedKeys);
+                entries.add(d);
+            }
         }
 
-        for (UserShowStatus s : statusRepository.findByUserIdAndWatchDateIsNotNull(userId)) {
-            DiaryEntryResponse d = new DiaryEntryResponse();
-            d.setShowId(s.getShowId());
-            d.setSeasonNumber(null);
-            d.setEpisodeNumber(null);
-            d.setWatchDate(s.getWatchDate());
-            d.setRating(s.getRating());
-            d.setLiked(s.isFavorite());
-            d.setRewatch(s.isRewatch());
-            d.setReview(s.getReview());
-            d.setWholeShow(true);
-            applyDiaryLikes(d, "SHOW", s.getId(), myLikedKeys);
-            entries.add(d);
-        }
-
+        // ვალაგებთ თარიღის მიხედვით ახლიდან ძველისკენ
         entries.sort(Comparator.comparing(DiaryEntryResponse::getWatchDate).reversed());
         return ResponseEntity.ok(entries);
     }

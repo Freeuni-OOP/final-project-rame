@@ -15,6 +15,8 @@ public interface UserShowStatusRepository extends JpaRepository<UserShowStatus, 
 
     List<UserShowStatus> findByUserIdAndStatusOrderByIdDesc(Long userId, SeriesStatus status);
 
+    List<UserShowStatus> findByUserId(Long userId);
+
     // ამ შოუს ყველა "Whole Show" რივიუ (მხოლოდ ის, სადაც review დაწერილია)
     List<UserShowStatus> findByShowIdAndReviewIsNotNull(int showId);
 

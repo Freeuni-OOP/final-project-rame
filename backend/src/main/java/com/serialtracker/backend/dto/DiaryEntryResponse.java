@@ -14,6 +14,7 @@ public class DiaryEntryResponse {
     private Integer episodeNumber;  // null თუ whole-show ჩანაწერია
     private LocalDate watchDate;
     private Integer rating;
+    private String status;
     private boolean liked;
     private boolean rewatch;
     private String review;
@@ -24,6 +25,7 @@ public class DiaryEntryResponse {
     private String reviewType;   // "EPISODE" | "SHOW"
     private long likeCount;
     private boolean likedByMe;   // მიმდინარე მნახველმა დაალაიქა თუ არა
+
 
     public DiaryEntryResponse() {}
 
@@ -41,6 +43,9 @@ public class DiaryEntryResponse {
 
     public Integer getRating() { return rating; }
     public void setRating(Integer rating) { this.rating = rating; }
+
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
 
     public boolean isLiked() { return liked; }
     public void setLiked(boolean liked) { this.liked = liked; }

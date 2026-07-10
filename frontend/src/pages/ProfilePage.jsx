@@ -111,6 +111,7 @@ function DiaryEditModal({ entry, username, token, onClose, onSaved }) {
     const [liked, setLiked] = useState(!!entry.liked);
     const [rewatch, setRewatch] = useState(!!entry.rewatch);
     const [saving, setSaving] = useState(false);
+    const [activeTab, setActiveTab] = useState('menu'); // 'menu', 'picture', 'username', 'password'
 
     const epLabel = (entry.seasonNumber != null && entry.episodeNumber != null)
         ? ` S${entry.seasonNumber}E${entry.episodeNumber}` : '';
@@ -225,9 +226,88 @@ export default function ProfilePage() {
     const [diaryEntries, setDiaryEntries] = useState([]);
     const [diarySort, setDiarySort] = useState('date-desc'); // date-desc | date-asc | rating-desc | rating-asc
     const [diaryYear, setDiaryYear] = useState('');
+    const [diaryStatus, setDiaryStatus] = useState('');
     const [diaryDecade, setDiaryDecade] = useState('');
     const [diaryGenre, setDiaryGenre] = useState('');
     const [editingEntry, setEditingEntry] = useState(null); // Diary-ს რომელ ჩანაწერს ვასწორებთ
+
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [newUsername, setNewUsername] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [selectedFile, setSelectedFile] = useState(null);
+    const [profilePicBase64, setProfilePicBase64] = useState(null);
+
+    const handleFileChange = (e) => {
+        setSelectedFile(e.target.files[0]);
+    };
+
+
+    const handleSaveChanges = (e) => {
+        e.preventDefault();
+
+        const rawToken = localStorage.getItem('token');
+        let cleanToken = rawToken ? (JSON.parse(rawToken).token || rawToken) : '';
+
+        const myHeaders = new Headers();
+        myHeaders.append("Authorization", `Bearer ${cleanToken}`);
+
+        const formData = new FormData();
+        formData.append('currentUsername', username); // მიმდინარე სახელი სულ სჭირდება ბექენდს იდენტიფიკაციისთვის
+
+        // 🟢 ბექენდს ვუგზავნით მხოლოდ იმას, რაც აქტიურ ტაბშია არჩეული
+        if (activeTab === 'username' && newUsername) {
+            formData.append('newUsername', newUsername);
+        } else if (activeTab === 'password' && newPassword) {
+            formData.append('password', newPassword);
+        } else if (activeTab === 'picture' && selectedFile) {
+            formData.append('profilePicture', selectedFile);
+        } else {
+            alert("Please fill out the selected field first.");
+            return;
+        }
+
+        fetch('https://localhost:8443/api/auth/profile', {
+            method: 'PUT',
+            headers: myHeaders,
+            body: formData
+        })
+            .then(async res => {
+                if (!res.ok) {
+                    const txt = await res.text();
+                    throw new Error(txt || 'Update failed');
+                }
+                return res.json();
+            })
+            .then(data => {
+                setShowEditModal(false);
+                setActiveTab('menu'); // მოდალის დახურვისას მენიუ ვამყოფოთ საწყის პოზიციაზე
+
+                if (data.usernameChanged) {
+                    alert('Username changed successfully! Please log in again with your new username.');
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('userAvatar'); // ძველი ფოტოს წაშლა
+                    navigate('/login');
+                } else {
+                    // 🟢 თუ იუზერმა აირჩია და შეცვალა ფოტო, ინახება local-შიც
+                    if (selectedFile) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                            localStorage.setItem('userAvatar', reader.result); // ინახავს Base64 სტრინგს
+                            alert('Updated successfully!');
+                            window.location.reload(); // რეფრეში, რომ ყველამ დაინახოს
+                        };
+                        reader.readAsDataURL(selectedFile);
+                    } else {
+                        alert('Updated successfully!');
+                        window.location.reload();
+                    }
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Failed to update: ' + err.message);
+            });
+    };
 
     const tokenObj = localStorage.getItem('token');
     const token = tokenObj ? JSON.parse(tokenObj).token : null;
@@ -243,85 +323,159 @@ export default function ProfilePage() {
     const isOwnProfile = !routeUsername || routeUsername === currentUsername;
     const authHeaders = { Authorization: `Bearer ${token}` };
 
-
 const loadAll = () => {
-        if (!username) return;
-        setLoading(true);
+const loadAll = () => {
+    if (!username) return;
+    setLoading(true);
 
-        const authHeaders = { Authorization: `Bearer ${token}` };
+    const authHeaders = { Authorization: `Bearer ${token}` };
 
-        // საჯარო მონაცემი (ნებისმიერი იუზერის): მეგობრები + watchlist + diary +
-        // "People you may know" — ეს ყოველთვის შემხედველის (currentUsername) შემოთავაზებაა,
-        // ამიტომ ჩანს ნებისმიერი პროფილის Network ტაბზეც, არა მხოლოდ საკუთარზე.
-        const publicCalls = [
-            fetch(`${FRIENDS_BASE_URL}?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-            fetch(`https://localhost:8443/api/tracking/watchlist?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-         
-            fetch(`https://localhost:8443/api/tracking/diary?username=${username}&viewer=${currentUsername || ''}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-            currentUsername
-                ? fetch(`${FRIENDS_BASE_URL}/suggestions?actingUsername=${currentUsername}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : []))
-                : Promise.resolve([]),
-            fetch(`https://localhost:8443/api/tracking/activity?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-            fetch(`https://localhost:8443/api/tracking/likes?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-            fetch(`https://localhost:8443/api/tracking/films-count?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : 0)),
-            fetch(`https://localhost:8443/api/favorites?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-        ];
+    // საჯარო მონაცემი (ნებისმიერი იუზერის): მეგობრები + watchlist + diary +
+    // "People you may know" — ეს ყოველთვის შემხედველის (currentUsername) შემოთავაზებაა,
+    // ამიტომ ჩანს ნებისმიერი პროფილის Network ტაბზეც, არა მხოლოდ საკუთარზე.
+    const publicCalls = [
+        fetch(`${FRIENDS_BASE_URL}?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+        fetch(`https://localhost:8443/api/tracking/watchlist?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+     
+        fetch(`https://localhost:8443/api/tracking/diary?username=${username}&viewer=${currentUsername || ''}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+        currentUsername
+            ? fetch(`${FRIENDS_BASE_URL}/suggestions?actingUsername=${currentUsername}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : []))
+            : Promise.resolve([]),
+        fetch(`https://localhost:8443/api/tracking/activity?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+        fetch(`https://localhost:8443/api/tracking/likes?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+        fetch(`https://localhost:8443/api/tracking/films-count?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : 0)),
+        fetch(`https://localhost:8443/api/favorites?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+    ];
 
-        // Private data (own profile only) — მოთხოვნები/რეკომენდაციები მხოლოდ საკუთარია
-        const privateCalls = isOwnProfile ? [
-            fetch(`${FRIENDS_BASE_URL}/pending?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-            fetch(`${FRIENDS_BASE_URL}/sent?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-            fetch(`https://localhost:8443/api/tracking/recommendations?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-        ] : [];
+    // Private data (own profile only) — მოთხოვნები/რეკომენდაციები მხოლოდ საკუთარია
+    const privateCalls = isOwnProfile ? [
+        fetch(`${FRIENDS_BASE_URL}/pending?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+        fetch(`${FRIENDS_BASE_URL}/sent?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+        fetch(`https://localhost:8443/api/tracking/recommendations?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+    ] : [];
 
-        Promise.all([...publicCalls, ...privateCalls])
-            .then(([
-                friendsList, 
-                watchlistIds, 
-                diaryList, 
-                suggestionslist = [], 
-                activityList = [], 
-                likedIds = [], 
-                filmsCountVal = 0,
-                favIds = [],
-                pendingList = [], 
-                sentlist = [], 
-                recsList = []
-            ]) => {
+    Promise.all([...publicCalls, ...privateCalls])
+        .then(([
+            friendsList, 
+            watchlistIds, 
+            diaryList, 
+            suggestionslist = [], 
+            activityList = [], 
+            likedIds = [], 
+            filmsCountVal = 0,
+            favIds = [],
+            pendingList = [], 
+            sentlist = [], 
+            recsList = []
+        ]) => {
 
-                setFriends(friendsList || []);
-                setFriendsCount((friendsList || []).length);
-                setFilmsCount(Number(filmsCountVal) || 0);
-                setWatchlistShowIds(watchlistIds || []);
-                (watchlistIds || []).forEach(ensureWatchlistShowInfo);
+            setFriends(friendsList || []);
+            setFriendsCount((friendsList || []).length);
+            setFilmsCount(Number(filmsCountVal) || 0);
+            setWatchlistShowIds(watchlistIds || []);
+            (watchlistIds || []).forEach(ensureWatchlistShowInfo);
 
-                setFavoriteShowIds(favIds || []);
-                (favIds || []).forEach(ensureWatchlistShowInfo);
+            setFavoriteShowIds(favIds || []);
+            (favIds || []).forEach(ensureWatchlistShowInfo);
 
-                setLikedShows(likedIds || []);
-                (likedIds || []).forEach(it => ensureWatchlistShowInfo(it.showId));
+            setLikedShows(likedIds || []);
+            (likedIds || []).forEach(it => ensureWatchlistShowInfo(it.showId));
 
-                setDiaryEntries(diaryList || []);
-                (diaryList || []).forEach(e => ensureWatchlistShowInfo(e.showId));
+            setDiaryEntries(diaryList || []);
+            (diaryList || []).forEach(e => ensureWatchlistShowInfo(e.showId));
 
-                setSuggestions(suggestionslist || []);
-                setActivities((activityList || []).sort((a, b) => b.id - a.id));
+            setSuggestions(suggestionslist || []);
+            setActivities((activityList || []).sort((a, b) => b.id - a.id));
 
-                if (isOwnProfile) {
-                    setPending(pendingList || []);
-                    setSent(sentlist || []);
-                    setRecommendations(recsList || []);
-                } else {
-                    setPending([]);
-                    setSent([]);
-                    setRecommendations([]);
-                }
-            })
-            .catch(err => console.error("Error loading profile data:", err))
-            .finally(() => setLoading(false));
-    };
+            if (isOwnProfile) {
+                setPending(pendingList || []);
+                setSent(sentlist || []);
+                setRecommendations(recsList || []);
+            } else {
+                setPending([]);
+                setSent([]);
+                setRecommendations([]);
+            }
+        ])
+        .catch(err => console.error("Error loading profile data:", err))
+        .finally(() => setLoading(false));
+};
 
+    const authHeaders = { Authorization: `Bearer ${token}` };
 
+    // საჯარო მონაცემი (ნებისმიერი იუზერის): მეგობრები + watchlist + diary + profile + activity
+    // "People you may know" — ეს ყოველთვის შემხედველის (currentUsername) შემოთავაზებაა,
+    // ამიტომ ჩანს ნებისმიერი პროფილის Network ტაბზეც, არა მხოლოდ საკუთარზე.
+    const publicCalls = [
+        fetch(`https://localhost:8443/api/auth/user/${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : null)),
+        fetch(`${FRIENDS_BASE_URL}?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+        fetch(`https://localhost:8443/api/tracking/watchlist?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+        fetch(`https://localhost:8443/api/tracking/diary?username=${username}&viewer=${currentUsername || ''}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+        currentUsername
+            ? fetch(`${FRIENDS_BASE_URL}/suggestions?actingUsername=${currentUsername}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : []))
+            : Promise.resolve([]),
+        fetch(`https://localhost:8443/api/tracking/activity?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+        fetch(`https://localhost:8443/api/tracking/likes?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+        fetch(`https://localhost:8443/api/tracking/films-count?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : 0)),
+    ];
+
+    // Private data (own profile only) — მოთხოვნები/რეკომენდაციები მხოლოდ საკუთარია
+    const privateCalls = isOwnProfile ? [
+        fetch(`${FRIENDS_BASE_URL}/pending?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+        fetch(`${FRIENDS_BASE_URL}/sent?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+        fetch(`https://localhost:8443/api/tracking/recommendations?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : []))
+    ] : [];
+
+    Promise.all([...publicCalls, ...privateCalls])
+        .then(([
+            userObj,
+            friendsList, 
+            watchlistIds, 
+            diaryList, 
+            suggestionslist = [], 
+            activityList = [], 
+            likedIds = [], 
+            filmsCountVal = 0,
+            pendingList = [], 
+            sentlist = [], 
+            recsList = []
+        ]) => {
+
+            // 🟢 Profile picture handling from feat/edit-profile
+            if (userObj && userObj.profilePicture) {
+                setProfilePicBase64(`data:image/jpeg;base64,${userObj.profilePicture}`);
+            } else {
+                setProfilePicBase64(null);
+            }
+
+            setFriends(friendsList || []);
+            setFriendsCount((friendsList || []).length);
+            setFilmsCount(Number(filmsCountVal) || 0);
+            setWatchlistShowIds(watchlistIds || []);
+            (watchlistIds || []).forEach(ensureWatchlistShowInfo);
+
+            setLikedShows(likedIds || []);
+            (likedIds || []).forEach(it => ensureWatchlistShowInfo(it.showId));
+
+            setDiaryEntries(diaryList || []);
+            (diaryList || []).forEach(e => ensureWatchlistShowInfo(e.showId));
+
+            setSuggestions(suggestionslist || []);
+            setActivities((activityList || []).sort((a, b) => b.id - a.id));
+
+            if (isOwnProfile) {
+                setPending(pendingList || []);
+                setSent(sentlist || []);
+                setRecommendations(recsList || []);
+            } else {
+                setPending([]);
+                setSent([]);
+                setRecommendations([]);
+            }
+        })
+        .catch(err => console.error("Error loading profile data:", err))
+        .finally(() => setLoading(false));
+};
     // Mirrors ListDetailPage's per-show info fetch: the watchlist endpoint
     // only returns raw showIds, so poster/title come from a per-id lookup,
     // cached so repeat renders/tab switches don't refetch.
@@ -369,9 +523,9 @@ const loadAll = () => {
 
     const handleRemoveFromWatchlist = (showId) => {
         if (!username) return;
-        fetch(`https://localhost:8443/api/tracking/show-status?username=${username}&showId=${showId}`, {
+        fetch(`https://localhost:8443/api/tracking/show-status?username=${username}&showId=${showId}&status=${status}...`, {
             method: 'POST',
-            headers: authHeaders,
+            headers: authHeaders
         })
             .then(r => {
                 if (!r.ok) throw new Error('Could not remove from watchlist.');
@@ -441,6 +595,8 @@ const loadAll = () => {
             setLoading(false);
             return;
         }
+        setNewUsername(username);
+
         loadAll();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [username]);
@@ -507,11 +663,20 @@ const loadAll = () => {
         .filter(d => !diaryYear || (d.watchDate || '').slice(0, 4) === diaryYear)
         .filter(d => !diaryDecade || decadeOf(d.released) === diaryDecade)
         .filter(d => !diaryGenre || d.genres.includes(diaryGenre))
+        .filter(d => !diaryStatus || d.status === diaryStatus)
         .sort((a, b) => {
-            if (diarySort === 'date-asc') return (a.watchDate || '').localeCompare(b.watchDate || '');
+            if (diarySort === 'date-asc') {
+                const dateCompare = (a.watchDate || '').localeCompare(b.watchDate || '');
+                if (dateCompare !== 0) return dateCompare;
+                return (a.reviewId || 0) - (b.reviewId || 0); // თუ თარიღი ტოლია, უფრო ძველი (პატარა ID) პირველი
+            }
             if (diarySort === 'rating-desc') return (b.rating || 0) - (a.rating || 0);
             if (diarySort === 'rating-asc') return (a.rating || 0) - (b.rating || 0);
-            return (b.watchDate || '').localeCompare(a.watchDate || ''); // date-desc (default)
+
+            // date-desc (Default - ახალი პირველი):
+            const dateCompare = (b.watchDate || '').localeCompare(a.watchDate || '');
+            if (dateCompare !== 0) return dateCompare;
+            return (b.reviewId || 0) - (a.reviewId || 0); // თუ თარიღი ტოლია, უფრო ახალი (დიდი ID) პირველი
         });
 
     // სხვისი diary-ჩანაწერის (რევიუს) ლაიქის toggle
@@ -574,17 +739,178 @@ const loadAll = () => {
             <main className="pp-main">
                 <section className="pp-header-section">
                     <div className="pp-header-left">
-                        <Avatar name={username} size={110} />
+                        {/* 🟢 აქ ჩაჯდა ფოტოს შემოწმების ლოგიკა */}
+                        {profilePicBase64 ? (
+                            <img
+                                src={profilePicBase64}
+                                alt={username}
+                                style={{
+                                    width: '110px',
+                                    height: '110px',
+                                    borderRadius: '50%',
+                                    objectFit: 'cover',
+                                    border: '2px solid rgba(255,255,255,0.1)'
+                                }}
+                            />
+                        ) : (
+                            <Avatar name={username} size={110} />
+                        )}
+
                         <div className="pp-header-info">
                             <h1 className="pp-display-name">{username}</h1>
                             {isOwnProfile && (
                                 <div className="pp-header-actions">
-                                    <button className="pp-edit-btn">Edit Profile</button>
+                                    <button
+                                        className="pp-edit-btn"
+                                        onClick={() => {
+                                            setActiveTab('menu'); // 🟢 ყოველთვის აბრუნებს საწყის მენიუზე გახსნისას
+                                            setShowEditModal(true);
+                                        }}
+                                    >
+                                        Edit Profile
+                                    </button>
                                     <button className="pp-more-btn" aria-label="More options">&hellip;</button>
                                 </div>
                             )}
                         </div>
                     </div>
+
+                    {/* 🟢 EDIT PROFILE მოდალური ფანჯარა */}
+                    {showEditModal && (
+                        <div className="modal-overlay" style={{
+                            position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+                            backgroundColor: 'rgba(0, 0, 0, 0.7)', display: 'flex',
+                            justifyContent: 'center', alignItems: 'center', zIndex: 1000
+                        }}>
+                            <div className="modal-content" style={{
+                                backgroundColor: '#1e1e1e', color: '#fff', padding: '30px',
+                                borderRadius: '12px', width: '100%', MarianWidth: '400px',
+                                boxShadow: '0 8px 24px rgba(0,0,0,0.5)', fontFamily: 'sans-serif'
+                            }}>
+                                <div className="modal-header" style={{
+                                    display: 'flex', justifyContent: 'space-between',
+                                    alignItems: 'center', marginBottom: '20px'
+                                }}>
+                                    <h2 style={{ margin: 0, fontSize: '22px', fontWeight: '600' }}>Edit Profile</h2>
+                                    <button
+                                        type="button"
+                                        className="close-btn"
+                                        onClick={() => {
+                                            setShowEditModal(false); setActiveTab('menu');
+                                        }}
+                                        style={{ background: 'none', border: 'none', color: '#888', fontSize: '20px', cursor: 'pointer' }}
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+
+                                <form onSubmit={handleSaveChanges}>
+                                    {/* 1. საწყისი არჩევანის მენიუ */}
+                                    {activeTab === 'menu' && (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '10px 0 20px 0' }}>
+                                            <p style={{ color: '#aaa', fontSize: '14px', marginBottom: '10px', textAlign: 'center' }}>
+                                                Select the setting you want to update:
+                                            </p>
+
+                                            <button type="button" onClick={() => setActiveTab('picture')} className="edit-menu-btn">
+                                                Change Profile Picture
+                                            </button>
+
+                                            <button type="button" onClick={() => setActiveTab('username')} className="edit-menu-btn">
+                                                Change Username
+                                            </button>
+
+                                            <button type="button" onClick={() => setActiveTab('password')} className="edit-menu-btn">
+                                                Change Password
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* 2. ფოტოს შეცვლის ფანჯარა */}
+                                    {activeTab === 'picture' && (
+                                        <div style={{ padding: '10px 0 20px 0' }}>
+                                            <label style={{ display: 'block', marginBottom: '8px', color: '#aaa', fontSize: '14px' }}>
+                                                Upload New Profile Picture
+                                            </label>
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={(e) => setSelectedFile(e.target.files[0])}
+                                                style={{ color: '#ccc', width: '100%', padding: '10px 0' }}
+                                                required
+                                            />
+                                        </div>
+                                    )}
+
+                                    {/* 3. იუზერნეიმის შეცვლის ფანჯარა */}
+                                    {activeTab === 'username' && (
+                                        <div style={{ padding: '10px 0 20px 0' }}>
+                                            <label style={{ display: 'block', marginBottom: '8px', color: '#aaa', fontSize: '14px' }}>
+                                                New Username
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={newUsername}
+                                                onChange={(e) => setNewUsername(e.target.value)}
+                                                placeholder="Enter username"
+                                                className="edit-modal-input"
+                                                required
+                                            />
+                                        </div>
+                                    )}
+
+                                    {/* 4. პაროლის შეცვლის ფანჯარა */}
+                                    {activeTab === 'password' && (
+                                        <div style={{ padding: '10px 0 20px 0' }}>
+                                            <label style={{ display: 'block', marginBottom: '8px', color: '#aaa', fontSize: '14px' }}>
+                                                New Password
+                                            </label>
+                                            <input
+                                                type="password"
+                                                value={newPassword}
+                                                onChange={(e) => setNewPassword(e.target.value)}
+                                                placeholder="Enter new password"
+                                                className="edit-modal-input"
+                                                required
+                                            />
+                                        </div>
+                                    )}
+
+                                    {/* ქვედა სამოქმედო ღილაკები */}
+                                    <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
+                                        {activeTab !== 'menu' ? (
+                                            <>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setActiveTab('menu')}
+                                                    className="edit-action-btn edit-btn-back"
+                                                >
+                                                    Back
+                                                </button>
+                                                <button
+                                                    type="submit"
+                                                    className="edit-action-btn edit-btn-save"
+                                                >
+                                                    Save Changes
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowEditModal(false)}
+                                                className="edit-action-btn edit-btn-cancel"
+                                            >
+                                                Cancel
+                                            </button>
+                                        )}
+                                    </div>
+
+
+
+                                </form>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="pp-stats">
                         <div className="pp-stat-item">
@@ -917,7 +1243,7 @@ const loadAll = () => {
                                                         )}
                                                     </div>
                                                 </div>
-                                            );
+                                            );f
                                         });
                                     })()}
                                 </div>
@@ -969,6 +1295,12 @@ const loadAll = () => {
                                 <DiaryDropdown label="Year" value={diaryYear} options={diaryYears} onChange={setDiaryYear} />
                                 <DiaryDropdown label="Decade" value={diaryDecade} options={diaryDecades} onChange={setDiaryDecade} />
                                 <DiaryDropdown label="Genre" value={diaryGenre} options={diaryGenres} onChange={setDiaryGenre} />
+                                <DiaryDropdown
+                                    label="Status"
+                                    value={diaryStatus}
+                                    options={['COMPLETED', 'WATCHING', 'PLAN_TO_WATCH', 'DROPPED']}
+                                    onChange={setDiaryStatus}
+                                />
                                 <span
                                     className="pp-diary-filter"
                                     style={{ cursor: 'pointer', color: diarySort.startsWith('date') ? '#00b4a2' : undefined }}
@@ -1004,70 +1336,103 @@ const loadAll = () => {
                                     const epLabel = (entry.seasonNumber != null && entry.episodeNumber != null)
                                         ? ` S${entry.seasonNumber}E${entry.episodeNumber}` : '';
                                     return (
-                                        <div key={`${entry.showId}-${entry.seasonNumber}-${entry.episodeNumber}-${wd}-${i}`} className="pp-diary-row">
+                                        <div key={`${entry.showId}-${wd}-${i}`} className="pp-diary-row">
                                             <span className="pp-diary-col-date">{formatDiaryDate(wd)}</span>
                                             <span className="pp-diary-col-film pp-diary-film-cell">
-                                                {entry.poster_path ? (
-                                                    <img
-                                                        src={`${POSTER_BASE}${entry.poster_path}`}
-                                                        alt={entry.title}
-                                                        className="pp-diary-poster"
-                                                        style={{ cursor: 'pointer', objectFit: 'cover' }}
-                                                        onClick={() => navigate(`/shows/${entry.showId}`)}
-                                                    />
-                                                ) : (
-                                                    <span className="pp-diary-poster" />
-                                                )}
-                                                <span
-                                                    className="pp-diary-film-title"
-                                                    style={{ cursor: 'pointer' }}
-                                                    onClick={() => navigate(`/shows/${entry.showId}`)}
-                                                >
-                                                    {entry.title}{epLabel}
-                                                </span>
-                                            </span>
+        {entry.poster_path ? (
+            <img
+                src={`${POSTER_BASE}${entry.poster_path}`}
+                alt={entry.title}
+                className="pp-diary-poster"
+                style={{ cursor: 'pointer', objectFit: 'cover' }}
+                onClick={() => navigate(`/shows/${entry.showId}`)}
+            />
+        ) : (
+            <span className="pp-diary-poster" />
+        )}
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
+            <span
+                className="pp-diary-film-title"
+                style={{ cursor: 'pointer', fontWeight: '600' }}
+                onClick={() => navigate(`/shows/${entry.showId}`)}
+            >
+                {entry.title}
+            </span>
+                                                    {entry.status && (
+                                                        <span style={{
+                                                            padding: '2px 8px',
+                                                            borderRadius: '4px',
+                                                            fontSize: '10px',
+                                                            fontWeight: 'bold',
+                                                            textTransform: 'uppercase',
+                                                            letterSpacing: '0.5px',
+                                                            background:
+                                                                entry.status === 'COMPLETED' ? 'rgba(46, 204, 113, 0.15)' :
+                                                                    entry.status === 'WATCHING' ? 'rgba(91, 141, 239, 0.15)' :
+                                                                        entry.status === 'PLAN_TO_WATCH' ? 'rgba(242, 177, 52, 0.15)' :
+                                                                            'rgba(232, 93, 117, 0.15)', // DROPPED
+                                                            color:
+                                                                entry.status === 'COMPLETED' ? '#2ecc71' :
+                                                                    entry.status === 'WATCHING' ? '#5b8def' :
+                                                                        entry.status === 'PLAN_TO_WATCH' ? '#f2b134' :
+                                                                            '#e85d75',
+                                                            border: `1px solid ${
+                                                                entry.status === 'COMPLETED' ? 'rgba(46, 204, 113, 0.3)' :
+                                                                    entry.status === 'WATCHING' ? 'rgba(91, 141, 239, 0.3)' :
+                                                                        entry.status === 'PLAN_TO_WATCH' ? 'rgba(242, 177, 52, 0.3)' :
+                                                                            'rgba(232, 93, 117, 0.3)'
+                                                            }`
+                                                        }}>
+                    {entry.status === 'COMPLETED' ? 'Watched' :
+                        entry.status === 'WATCHING' ? 'Watching' :
+                            entry.status === 'PLAN_TO_WATCH' ? 'Plan to Watch' :
+                                entry.status === 'DROPPED' ? 'Dropped' : entry.status.replace(/_/g, ' ')}
+                </span>
+                                                    )}
+        </div>
+    </span>
                                             <span className="pp-diary-col-released">{entry.released}</span>
                                             <span className="pp-diary-col-rating pp-diary-stars">
-                                                <span className="pp-diary-stars-filled">{'★'.repeat(rating)}</span>
-                                                <span className="pp-diary-stars-empty">{'★'.repeat(5 - rating)}</span>
-                                            </span>
+        <span className="pp-diary-stars-filled">{'★'.repeat(rating)}</span>
+        <span className="pp-diary-stars-empty">{'★'.repeat(5 - rating)}</span>
+    </span>
                                             <span className="pp-diary-col-like">
-                                                {entry.liked && (
-                                                    <span className="pp-diary-heart pp-diary-heart-filled">
-                                                        <HeartIcon />
-                                                    </span>
-                                                )}
-                                            </span>
+        {entry.liked && (
+            <span className="pp-diary-heart pp-diary-heart-filled">
+                <HeartIcon />
+            </span>
+        )}
+    </span>
                                             <span className="pp-diary-col-rewatch">{entry.rewatch ? '↻' : ''}</span>
                                             <span className="pp-diary-col-review" title={entry.review || ''}>
-                                                {entry.review || ''}
-                                            </span>
+        {entry.review || ''}
+    </span>
                                             <span className="pp-diary-col-edit">
-                                                {isOwnProfile ? (
-                                                    <span
-                                                        className="pp-diary-edit-icon"
-                                                        style={{ cursor: 'pointer' }}
-                                                        title="Edit review"
-                                                        onClick={() => setEditingEntry(entry)}
-                                                    >
-                                                        ✎
-                                                    </span>
-                                                ) : (
-                                                    <span
-                                                        className="pp-diary-like-cell"
-                                                        title={entry.likedByMe ? 'Unlike' : 'Like this review'}
-                                                    >
-                                                        <span
-                                                            className="pp-diary-like-heart"
-                                                            style={{ cursor: 'pointer', color: entry.likedByMe ? '#e85d75' : '#5f758a' }}
-                                                            onClick={() => handleDiaryReviewLike(entry)}
-                                                        >
-                                                            {entry.likedByMe ? '♥' : '♡'}
-                                                        </span>
-                                                        <span className="pp-diary-like-count">{entry.likeCount || 0}</span>
-                                                    </span>
-                                                )}
-                                            </span>
+        {isOwnProfile ? (
+            <span
+                className="pp-diary-edit-icon"
+                style={{ cursor: 'pointer' }}
+                title="Edit review"
+                onClick={() => setEditingEntry(entry)}
+            >
+                ✎
+            </span>
+        ) : (
+            <span
+                className="pp-diary-like-cell"
+                title={entry.likedByMe ? 'Unlike' : 'Like this review'}
+            >
+                <span
+                    className="pp-diary-like-heart"
+                    style={{ cursor: 'pointer', color: entry.likedByMe ? '#e85d75' : '#5f758a' }}
+                    onClick={() => handleDiaryReviewLike(entry)}
+                >
+                    {entry.likedByMe ? '♥' : '♡'}
+                </span>
+                <span className="pp-diary-like-count">{entry.likeCount || 0}</span>
+            </span>
+        )}
+    </span>
                                         </div>
                                     );
                                 })}

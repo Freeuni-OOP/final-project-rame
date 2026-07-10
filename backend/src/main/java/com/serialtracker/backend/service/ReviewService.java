@@ -70,13 +70,6 @@ public class ReviewService {
         return res;
     }
 
-    /**
-     * ამ შოუს რივიუები, არასავალდებულო სპოილერ-ფილტრით.
-     * @param showId          სერიალის TMDB id
-     * @param currentUsername ვინ უყურებს გვერდს (მეგობრების გასარჩევად); შეიძლება null
-     * @param uptoSeason      მიმდინარე არჩეული სეზონი (null = ფილტრი გამორთულია)
-     * @param uptoEpisode     მიმდინარე არჩეული ეპიზოდი (null = ფილტრი გამორთულია)
-     */
     public List<ReviewResponse> getReviewsForShow(int showId, String currentUsername,
                                                   Integer uptoSeason, Integer uptoEpisode) {
 
@@ -85,7 +78,6 @@ public class ReviewService {
         if (currentUsername != null) {
             userRepository.findByUsername(currentUsername).ifPresent(me -> {
                 for (Friendship f : friendshipRepository.findAcceptedFriendshipsOf(me)) {
-                    // მეორე მხარე (არა მე)
                     Long otherId = f.getRequester().getId().equals(me.getId())
                             ? f.getRecipient().getId()
                             : f.getRequester().getId();
@@ -94,7 +86,7 @@ public class ReviewService {
             });
         }
 
-        // 1b) მიმდინარე მნახველის ლაიქები (TYPE:id კომპლექტად, სწრაფი lookup-ისთვის)
+        // 1b) მიმდინარე მნახველის ლაიქები
         Set<String> myLikedKeys = new HashSet<>();
         if (currentUsername != null) {
             userRepository.findByUsername(currentUsername).ifPresent(me -> {
@@ -104,20 +96,28 @@ public class ReviewService {
             });
         }
 
-        // 2) userId → username რუკა (რომ ყოველ რივიუზე ცალკე მოთხოვნა არ გავუშვათ)
-        Map<Long, String> usernameCache = new HashMap<>();
-
+        // 2) 🟢 იუზერის ობიექტების ქეში (რომ ბაზა არ გადაიტვირთოს)
+        Map<Long, User> userCache = new HashMap<>();
         List<ReviewResponse> result = new ArrayList<>();
 
         // 3) ეპიზოდების რივიუები
         for (UserEpisodeStatus ep : episodeStatusRepository.findByShowIdAndReviewIsNotNull(showId)) {
-            // სპოილერ-ფილტრი: მხოლოდ მიმდინარე სეზონი/ეპიზოდის ჩათვლით და უკან
             if (!passesSpoilerFilter(ep.getSeasonNumber(), ep.getEpisodeNumber(), uptoSeason, uptoEpisode)) {
                 continue;
             }
             ReviewResponse r = new ReviewResponse();
-            String uname = resolveUsername(ep.getUserId(), usernameCache);
-            r.setUsername(uname);
+
+            // 🟢 ვიღებთ ან ვაქეშირებთ იუზერს
+            User user = userCache.computeIfAbsent(ep.getUserId(), id -> userRepository.findById(id).orElse(null));
+            if (user != null) {
+                r.setUsername(user.getUsername());
+                if (user.getProfilePicture() != null) {
+                    r.setProfilePicture(java.util.Base64.getEncoder().encodeToString(user.getProfilePicture()));
+                }
+            } else {
+                r.setUsername("Unknown");
+            }
+
             r.setRating(ep.getRating());
             r.setReview(ep.getReview());
             r.setLiked(ep.isLiked());
@@ -129,11 +129,21 @@ public class ReviewService {
             result.add(r);
         }
 
-        // 4) Whole Show რივიუები (სეზონი/ეპიზოდი არ აქვთ → სპოილერს არ ექვემდებარებიან)
+        // 4) Whole Show რივიუები
         for (UserShowStatus show : showStatusRepository.findByShowIdAndReviewIsNotNull(showId)) {
             ReviewResponse r = new ReviewResponse();
-            String uname = resolveUsername(show.getUserId(), usernameCache);
-            r.setUsername(uname);
+
+            // 🟢 იგივე ქეშირება მთლიანი შოუს რევიუებისთვის
+            User user = userCache.computeIfAbsent(show.getUserId(), id -> userRepository.findById(id).orElse(null));
+            if (user != null) {
+                r.setUsername(user.getUsername());
+                if (user.getProfilePicture() != null) {
+                    r.setProfilePicture(java.util.Base64.getEncoder().encodeToString(user.getProfilePicture()));
+                }
+            } else {
+                r.setUsername("Unknown");
+            }
+
             r.setRating(show.getRating());
             r.setReview(show.getReview());
             r.setLiked(show.isFavorite());
@@ -147,7 +157,6 @@ public class ReviewService {
 
         return result;
     }
-
     // რევიუზე ლაიქების რაოდენობა + reviewId/type + მნახველმა დაალაიქა თუ არა
     private void applyLikes(ReviewResponse r, String type, Long reviewId, Set<String> myLikedKeys) {
         r.setReviewId(reviewId);
