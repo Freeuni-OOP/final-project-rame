@@ -1094,6 +1094,19 @@
     position: relative;
 }
 
+.pp-likes-rating-badge {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    background: rgba(15, 17, 21, 0.85);
+    color: #f59e0b;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 6px;
+    pointer-events: none;
+}
+
 .pp-watchlist-poster {
     width: 100%;
     aspect-ratio: 2 / 3;
@@ -1656,4 +1669,81 @@
         opacity: 1;
         transform: scale(1);
     }
+}
+/* Likes → Lists ქვე-ტაბი: მოწონებული სიების ბარათები */
+.pp-liked-lists {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 14px;
+}
+
+.pp-liked-list-card {
+    background: #1c252f;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    padding: 16px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.pp-liked-list-card:hover {
+    border-color: #00b4a2;
+    transform: translateY(-2px);
+}
+
+.pp-liked-list-posters {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.pp-liked-list-poster {
+    flex: 0 0 62px;
+    width: 62px;
+    height: 93px;
+    aspect-ratio: 2 / 3;
+    border-radius: 6px;
+    object-fit: cover;
+    background: #24303c;
+}
+
+.pp-liked-list-poster-empty {
+    background: #24303c;
+}
+
+.pp-liked-list-name {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pp-liked-list-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    font-size: 0.8rem;
+    color: #9ab3c8;
+}
+
+.pp-liked-list-pill {
+    background: #24303c;
+    color: #cbd5e1;
+    border-radius: 5px;
+    padding: 2px 8px;
+    font-size: 0.72rem;
+}
+
+.pp-liked-list-hearts {
+    color: #e85d75;
+}
+
+.pp-liked-list-owner {
+    margin-top: 10px;
+    font-size: 0.78rem;
+    color: #7c8ea0;
 }
