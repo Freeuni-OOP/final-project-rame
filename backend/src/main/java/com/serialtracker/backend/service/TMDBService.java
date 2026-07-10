@@ -1,8 +1,13 @@
 package com.serialtracker.backend.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class TMDBService {
@@ -64,5 +69,28 @@ public class TMDBService {
     public String getShowsByGenre(String genreId, int page) {
         String url = "https://api.themoviedb.org/3/discover/tv?api_key=" + apiKey + "&with_genres=" + genreId + "&page=" + page;
         return restTemplate.getForObject(url, String.class);
+    }
+
+    /** შოუს სახელი და პოსტერი — ლენტისთვის, სადაც ეს ველები ბაზაში არ გვაქვს. */
+    public record ShowSummary(String name, String posterPath) {}
+
+    private final Map<Integer, ShowSummary> summaryCache = new ConcurrentHashMap<>();
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    /**
+     * TMDB-ის მოთხოვნა ერთ შოუზე, ქეშირებული. ჩავარდნისას აბრუნებს ცარიელ summary-ს,
+     * რომ ერთმა წაშლილმა შოუმ მთელი ლენტა არ ჩააგდოს.
+     */
+    public ShowSummary getShowSummary(int showId) {
+        return summaryCache.computeIfAbsent(showId, id -> {
+            try {
+                JsonNode node = objectMapper.readTree(getShowDetails(id));
+                String name = node.path("name").asText(null);
+                String poster = node.path("poster_path").asText(null);
+                return new ShowSummary(name, poster);
+            } catch (Exception e) {
+                return new ShowSummary(null, null);
+            }
+        });
     }
 }
