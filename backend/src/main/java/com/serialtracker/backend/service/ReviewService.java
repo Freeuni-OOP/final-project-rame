@@ -1,5 +1,6 @@
 package com.serialtracker.backend.service;
 
+import com.serialtracker.backend.dto.FeedItemResponse;
 import com.serialtracker.backend.dto.ReviewResponse;
 import com.serialtracker.backend.entity.Friendship;
 import com.serialtracker.backend.entity.User;
@@ -14,6 +15,7 @@ import com.serialtracker.backend.repository.UserShowStatusRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -31,17 +33,20 @@ public class ReviewService {
     private final UserEpisodeStatusRepository episodeStatusRepository;
     private final FriendshipRepository friendshipRepository;
     private final ReviewLikeRepository reviewLikeRepository;
+    private final TMDBService tmdbService;
 
     public ReviewService(UserRepository userRepository,
                          UserShowStatusRepository showStatusRepository,
                          UserEpisodeStatusRepository episodeStatusRepository,
                          FriendshipRepository friendshipRepository,
-                         ReviewLikeRepository reviewLikeRepository) {
+                         ReviewLikeRepository reviewLikeRepository,
+                         TMDBService tmdbService) {
         this.userRepository = userRepository;
         this.showStatusRepository = showStatusRepository;
         this.episodeStatusRepository = episodeStatusRepository;
         this.friendshipRepository = friendshipRepository;
         this.reviewLikeRepository = reviewLikeRepository;
+        this.tmdbService = tmdbService;
     }
 
     /**
@@ -68,6 +73,161 @@ public class ReviewService {
         res.put("liked", liked);
         res.put("likeCount", reviewLikeRepository.countByReviewTypeAndReviewId(reviewType, reviewId));
         return res;
+    }
+
+    /**
+     * მთავარი გვერდის ლენტა: მხოლოდ მეგობრების ჩანაწერები, სადაც რივიუ ან რეიტინგია.
+     * ახლიდან ძველისკენ; ჯერ watchDate, თარიღის უქონლობისას — ჩანაწერის id.
+     */
+    public List<FeedItemResponse> getFriendsFeed(String currentUsername, int limit) {
+        User me = userRepository.findByUsername(currentUsername).orElse(null);
+        if (me == null) return List.of();
+
+        Set<Long> friendIds = new HashSet<>();
+        for (Friendship f : friendshipRepository.findAcceptedFriendshipsOf(me)) {
+            Long otherId = f.getRequester().getId().equals(me.getId())
+                    ? f.getRecipient().getId()
+                    : f.getRequester().getId();
+            friendIds.add(otherId);
+        }
+        if (friendIds.isEmpty()) return List.of();
+
+        Set<String> myLikedKeys = new HashSet<>();
+        for (ReviewLike rl : reviewLikeRepository.findByLikerUserId(me.getId())) {
+            myLikedKeys.add(rl.getReviewType() + ":" + rl.getReviewId());
+        }
+
+        Map<Long, User> userCache = new HashMap<>();
+        List<FeedItemResponse> feed = new ArrayList<>();
+
+        for (UserEpisodeStatus ep : episodeStatusRepository.findFeedEntriesByUserIds(friendIds)) {
+            if (isBlank(ep.getReview()) && ep.getRating() == null) continue;
+            FeedItemResponse item = newFeedItem(ep.getUserId(), ep.getShowId(), userCache);
+            item.setRating(ep.getRating());
+            item.setReview(isBlank(ep.getReview()) ? null : ep.getReview());
+            item.setLiked(ep.isLiked());
+            item.setRewatch(ep.isRewatch());
+            item.setWatchDate(ep.getWatchDate());
+            item.setSeasonNumber(ep.getSeasonNumber());
+            item.setEpisodeNumber(ep.getEpisodeNumber());
+            applyFeedLikes(item, TYPE_EPISODE, ep.getId(), myLikedKeys);
+            feed.add(item);
+        }
+
+        for (UserShowStatus show : showStatusRepository.findFeedEntriesByUserIds(friendIds)) {
+            if (isBlank(show.getReview()) && show.getRating() == null) continue;
+            FeedItemResponse item = newFeedItem(show.getUserId(), show.getShowId(), userCache);
+            item.setRating(show.getRating());
+            item.setReview(isBlank(show.getReview()) ? null : show.getReview());
+            item.setLiked(show.isFavorite());
+            item.setRewatch(show.isRewatch());
+            item.setWatchDate(show.getWatchDate());
+            applyFeedLikes(item, TYPE_SHOW, show.getId(), myLikedKeys);
+            feed.add(item);
+        }
+
+        feed.sort(Comparator
+                .comparing(FeedItemResponse::getWatchDate,
+                        Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(FeedItemResponse::getReviewId, Comparator.reverseOrder()));
+
+        return hydrateTop(feed, limit);
+    }
+
+    /**
+     * საჯარო რივიუების ლენტა: ყველა იუზერის ჩანაწერი, სადაც რივიუ ან რეიტინგია.
+     * sort="popular" — ლაიქების მიხედვით; ნებისმიერი სხვა — უახლესი ჯერ (ჩანაწერის id-ით).
+     */
+    public List<FeedItemResponse> getPublicFeed(String currentUsername, String sort, int limit) {
+        Set<String> myLikedKeys = new HashSet<>();
+        if (currentUsername != null) {
+            userRepository.findByUsername(currentUsername).ifPresent(me -> {
+                for (ReviewLike rl : reviewLikeRepository.findByLikerUserId(me.getId())) {
+                    myLikedKeys.add(rl.getReviewType() + ":" + rl.getReviewId());
+                }
+            });
+        }
+
+        Map<Long, User> userCache = new HashMap<>();
+        List<FeedItemResponse> feed = new ArrayList<>();
+
+        for (UserEpisodeStatus ep : episodeStatusRepository.findAllReviewed()) {
+            if (isBlank(ep.getReview()) && ep.getRating() == null) continue;
+            FeedItemResponse item = newFeedItem(ep.getUserId(), ep.getShowId(), userCache);
+            item.setRating(ep.getRating());
+            item.setReview(isBlank(ep.getReview()) ? null : ep.getReview());
+            item.setLiked(ep.isLiked());
+            item.setRewatch(ep.isRewatch());
+            item.setWatchDate(ep.getWatchDate());
+            item.setSeasonNumber(ep.getSeasonNumber());
+            item.setEpisodeNumber(ep.getEpisodeNumber());
+            applyFeedLikes(item, TYPE_EPISODE, ep.getId(), myLikedKeys);
+            feed.add(item);
+        }
+
+        for (UserShowStatus show : showStatusRepository.findAllReviewed()) {
+            if (isBlank(show.getReview()) && show.getRating() == null) continue;
+            FeedItemResponse item = newFeedItem(show.getUserId(), show.getShowId(), userCache);
+            item.setRating(show.getRating());
+            item.setReview(isBlank(show.getReview()) ? null : show.getReview());
+            item.setLiked(show.isFavorite());
+            item.setRewatch(show.isRewatch());
+            item.setWatchDate(show.getWatchDate());
+            applyFeedLikes(item, TYPE_SHOW, show.getId(), myLikedKeys);
+            feed.add(item);
+        }
+
+        Comparator<FeedItemResponse> newest =
+                Comparator.comparing(FeedItemResponse::getReviewId, Comparator.reverseOrder());
+
+        if ("popular".equalsIgnoreCase(sort)) {
+            feed.sort(Comparator.comparingLong(FeedItemResponse::getLikeCount).reversed()
+                    .thenComparing(newest));
+        } else {
+            feed.sort(newest);
+        }
+
+        return hydrateTop(feed, limit);
+    }
+
+    /** ჭრის ჩამონათვალს limit-ამდე და მხოლოდ ამ ნაწილს ავსებს TMDB-ის სახელით/პოსტერით. */
+    private List<FeedItemResponse> hydrateTop(List<FeedItemResponse> feed, int limit) {
+        List<FeedItemResponse> top = feed.size() > limit ? feed.subList(0, limit) : feed;
+        for (FeedItemResponse item : top) {
+            TMDBService.ShowSummary summary = tmdbService.getShowSummary(item.getShowId());
+            item.setShowName(summary.name());
+            item.setPosterPath(summary.posterPath());
+        }
+        return top;
+    }
+
+    /** ავტორი + showId. შოუს სახელი/პოსტერი ცალკე, hydrateTop-ში ივსება. */
+    private FeedItemResponse newFeedItem(Long authorId, int showId, Map<Long, User> userCache) {
+        FeedItemResponse item = new FeedItemResponse();
+
+        User author = userCache.computeIfAbsent(authorId, id -> userRepository.findById(id).orElse(null));
+        if (author != null) {
+            item.setUsername(author.getUsername());
+            if (author.getProfilePicture() != null) {
+                item.setProfilePicture(java.util.Base64.getEncoder().encodeToString(author.getProfilePicture()));
+            }
+        } else {
+            item.setUsername("Unknown");
+        }
+
+        item.setShowId(showId);
+        return item;
+    }
+
+    private void applyFeedLikes(FeedItemResponse item, String type, Long reviewId, Set<String> myLikedKeys) {
+        item.setReviewId(reviewId);
+        item.setReviewType(type);
+        item.setLikeCount(reviewLikeRepository.countByReviewTypeAndReviewId(type, reviewId));
+        item.setLikedByMe(myLikedKeys.contains(type + ":" + reviewId));
+    }
+
+    private static boolean isBlank(String s) {
+        return s == null || s.isBlank();
     }
 
     public List<ReviewResponse> getReviewsForShow(int showId, String currentUsername,

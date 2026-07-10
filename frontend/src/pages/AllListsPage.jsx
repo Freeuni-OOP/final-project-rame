@@ -63,7 +63,7 @@ function MyListCard({ list, posterPaths, itemCount, onOpen }) {
     );
 }
 
-function FeaturedListCard({ list, posterPaths, itemCount, onOpen }) {
+function FeaturedListCard({ list, posterPaths, itemCount, onOpen, liked, onLike, showLike }) {
     return (
         <div className="lp-card" onClick={() => onOpen(list.id)}>
             <RealPosterStrip posterPaths={posterPaths} size="lg" />
@@ -76,6 +76,16 @@ function FeaturedListCard({ list, posterPaths, itemCount, onOpen }) {
             </div>
             <div className="lp-card-stats">
                 <span className="lp-stat">{itemCount} {itemCount === 1 ? 'show' : 'shows'}</span>
+                {showLike && (
+                    <button
+                        type="button"
+                        className={`lp-card-like-btn${liked ? ' lp-card-like-btn-active' : ''}`}
+                        onClick={onLike}
+                        title={liked ? 'Unlike this list' : 'Like this list'}
+                    >
+                        ♥
+                    </button>
+                )}
             </div>
         </div>
     );
@@ -93,6 +103,9 @@ export default function AllListsPage() {
     const [itemsByListId, setItemsByListId] = useState({});
     const [showInfoCache, setShowInfoCache] = useState({});
     const requestedShowIds = useRef(new Set());
+
+    const [recentlyLiked, setRecentlyLiked] = useState([]);
+    const [likeCountOverride, setLikeCountOverride] = useState({});
 
     const tokenObj = localStorage.getItem('token');
     const token = tokenObj ? JSON.parse(tokenObj).token : null;
@@ -172,6 +185,48 @@ export default function AllListsPage() {
         loadLists();
     }, [loadLists]);
 
+    // Fetch liked lists so we know which cards to show as active
+    useEffect(() => {
+        if (!username) return;
+        fetch(`${LISTS_BASE_URL}/liked?username=${username}`, { headers: authHeaders })
+            .then(r => (r.ok ? r.json() : []))
+            .then(data => setRecentlyLiked(data || []))
+            .catch(() => {});
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [username]);
+
+    const likedSet = new Set(recentlyLiked.map(l => l.id));
+
+    const handleCardLike = (list, e) => {
+        e.stopPropagation();
+        if (!username) return;
+
+        const currentlyLiked = likedSet.has(list.id);
+        const currentCount = likeCountOverride[list.id] !== undefined
+            ? likeCountOverride[list.id]
+            : (list.likeCount || 0);
+
+        if (currentlyLiked) {
+            setRecentlyLiked(prev => prev.filter(l => l.id !== list.id));
+            setLikeCountOverride(prev => ({ ...prev, [list.id]: Math.max(0, currentCount - 1) }));
+            fetch(`${LISTS_BASE_URL}/${list.id}/like?username=${username}`, {
+                method: 'POST', headers: authHeaders,
+            }).catch(() => {
+                setRecentlyLiked(prev => [list, ...prev]);
+                setLikeCountOverride(prev => ({ ...prev, [list.id]: currentCount }));
+            });
+        } else {
+            setRecentlyLiked(prev => [{ ...list, likeCount: currentCount + 1 }, ...prev]);
+            setLikeCountOverride(prev => ({ ...prev, [list.id]: currentCount + 1 }));
+            fetch(`${LISTS_BASE_URL}/${list.id}/like?username=${username}`, {
+                method: 'POST', headers: authHeaders,
+            }).catch(() => {
+                setRecentlyLiked(prev => prev.filter(l => l.id !== list.id));
+                setLikeCountOverride(prev => ({ ...prev, [list.id]: currentCount }));
+            });
+        }
+    };
+
     const title = isMine ? 'My Lists' : isPopular ? 'Popular This Week' : 'Featured Lists';
 
     return (
@@ -202,14 +257,27 @@ export default function AllListsPage() {
                             const posterPaths = items
                                 .map(item => showInfoCache[item.showId]?.poster_path)
                                 .filter(Boolean);
-                            const Card = isMine ? MyListCard : FeaturedListCard;
+                            if (isMine) {
+                                return (
+                                    <MyListCard
+                                        key={list.id}
+                                        list={list}
+                                        posterPaths={posterPaths}
+                                        itemCount={items.length}
+                                        onOpen={(id) => navigate(`/lists/${id}`)}
+                                    />
+                                );
+                            }
                             return (
-                                <Card
+                                <FeaturedListCard
                                     key={list.id}
                                     list={list}
                                     posterPaths={posterPaths}
                                     itemCount={items.length}
                                     onOpen={(id) => navigate(`/lists/${id}`)}
+                                    liked={likedSet.has(list.id)}
+                                    onLike={(e) => handleCardLike(list, e)}
+                                    showLike={!!username}
                                 />
                             );
                         })}
