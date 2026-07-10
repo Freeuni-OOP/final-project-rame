@@ -23,6 +23,7 @@ export default function ReviewsPage() {
     const [discover, setDiscover] = useState([]);
     const [sort, setSort] = useState('popular'); // 'popular' | 'newest'
     const [loadingDiscover, setLoadingDiscover] = useState(true);
+    const [selectedPost, setSelectedPost] = useState(null); // გახსნილი რივიუს მოდალი
 
     const tokenObj = localStorage.getItem('token');
     const token = tokenObj ? JSON.parse(tokenObj).token : null;
@@ -58,6 +59,14 @@ export default function ReviewsPage() {
 
     useEffect(() => { loadDiscover(); }, [loadDiscover]);
 
+    // Escape ხურავს რივიუს მოდალს
+    useEffect(() => {
+        if (!selectedPost) return;
+        const onKey = (e) => { if (e.key === 'Escape') setSelectedPost(null); };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [selectedPost]);
+
     const handleLike = (post) => {
         if (!username || !post.reviewId) return;
 
@@ -75,6 +84,11 @@ export default function ReviewsPage() {
                 );
                 setFriends(patch);
                 setDiscover(patch);
+                setSelectedPost(prev =>
+                    (prev && prev.reviewId === post.reviewId && prev.reviewType === post.reviewType)
+                        ? { ...prev, likeCount: data.likeCount, likedByMe: data.liked }
+                        : prev
+                );
             })
             .catch(err => console.error('Failed to toggle like:', err));
     };
@@ -86,18 +100,25 @@ export default function ReviewsPage() {
             ? `S${post.seasonNumber} E${post.episodeNumber}`
             : null;
 
+        const stop = (fn) => (e) => { e.stopPropagation(); fn(); };
+
         return (
-            <article className="rev-card" key={`${post.reviewType}-${post.reviewId}`}>
+            <article
+                className="rev-card"
+                key={`${post.reviewType}-${post.reviewId}`}
+                onClick={() => setSelectedPost(post)}
+                title="Open review"
+            >
                 <header className="rev-card-head">
                     <div
                         className="rev-avatar"
-                        onClick={() => navigate(`/profile/${post.username}`)}
+                        onClick={stop(() => navigate(`/profile/${post.username}`))}
                         title={`View ${post.username}'s profile`}
                         style={{ backgroundColor: avatarSrc ? 'transparent' : getAvatarColor(post.username) }}
                     >
                         {avatarSrc ? <img src={avatarSrc} alt={post.username} /> : initial}
                     </div>
-                    <span className="rev-author" onClick={() => navigate(`/profile/${post.username}`)}>
+                    <span className="rev-author" onClick={stop(() => navigate(`/profile/${post.username}`))}>
                         {post.username}
                     </span>
                 </header>
@@ -105,7 +126,7 @@ export default function ReviewsPage() {
                 <div className="rev-card-body">
                     <div
                         className="rev-poster"
-                        onClick={() => navigate(`/shows/${post.showId}`)}
+                        onClick={stop(() => navigate(`/shows/${post.showId}`))}
                         title={post.showName || 'View show'}
                     >
                         {post.posterPath
@@ -114,7 +135,7 @@ export default function ReviewsPage() {
                     </div>
 
                     <div className="rev-info">
-                        <span className="rev-show-name" onClick={() => navigate(`/shows/${post.showId}`)}>
+                        <span className="rev-show-name" onClick={stop(() => navigate(`/shows/${post.showId}`))}>
                             {post.showName || `Show #${post.showId}`}
                         </span>
                         <div className="rev-tags">
@@ -133,7 +154,7 @@ export default function ReviewsPage() {
                     <button
                         type="button"
                         className={`rev-like-button${post.likedByMe ? ' liked' : ''}`}
-                        onClick={() => handleLike(post)}
+                        onClick={stop(() => handleLike(post))}
                         title={post.likedByMe ? 'Unlike this review' : 'Like this review'}
                     >
                         <span className="rev-like-heart">{post.likedByMe ? '♥' : '♡'}</span>
@@ -141,6 +162,89 @@ export default function ReviewsPage() {
                     </button>
                 </footer>
             </article>
+        );
+    };
+
+    const renderModal = () => {
+        const post = selectedPost;
+        if (!post) return null;
+
+        const avatarSrc = post.profilePicture ? `data:image/jpeg;base64,${post.profilePicture}` : null;
+        const initial = post.username ? post.username.charAt(0).toUpperCase() : '?';
+        const episodeBadge = post.seasonNumber != null && post.episodeNumber != null
+            ? `S${post.seasonNumber} E${post.episodeNumber}`
+            : null;
+
+        return (
+            <div className="review-modal-overlay" onClick={() => setSelectedPost(null)}>
+                <div className="review-modal" onClick={(e) => e.stopPropagation()}>
+                    <button
+                        type="button"
+                        className="review-modal-close"
+                        onClick={() => setSelectedPost(null)}
+                        title="Close"
+                    >
+                        ×
+                    </button>
+
+                    <header className="review-modal-head">
+                        <div
+                            className="rev-avatar"
+                            onClick={() => navigate(`/profile/${post.username}`)}
+                            title={`View ${post.username}'s profile`}
+                            style={{ backgroundColor: avatarSrc ? 'transparent' : getAvatarColor(post.username) }}
+                        >
+                            {avatarSrc ? <img src={avatarSrc} alt={post.username} /> : initial}
+                        </div>
+                        <span className="rev-author" onClick={() => navigate(`/profile/${post.username}`)}>
+                            {post.username}
+                        </span>
+                    </header>
+
+                    <div className="review-modal-body">
+                        <div
+                            className="review-modal-poster"
+                            onClick={() => navigate(`/shows/${post.showId}`)}
+                            title={post.showName || 'View show'}
+                        >
+                            {post.posterPath
+                                ? <img src={`${POSTER_BASE}${post.posterPath}`} alt={post.showName || 'Poster'} />
+                                : <div className="rev-poster-empty">No poster</div>}
+                        </div>
+
+                        <div className="review-modal-info">
+                            <span className="review-modal-show" onClick={() => navigate(`/shows/${post.showId}`)}>
+                                {post.showName || `Show #${post.showId}`}
+                            </span>
+                            <div className="rev-tags">
+                                {post.rating != null && post.rating > 0 && (
+                                    <span className="rev-stars">{'★'.repeat(post.rating)}</span>
+                                )}
+                                {post.liked && <span className="rev-heart">{'♥'}</span>}
+                                {episodeBadge && <span className="rev-badge">{episodeBadge}</span>}
+                                {post.rewatch && <span className="rev-badge">{'↻'} rewatch</span>}
+                            </div>
+                            {post.watchDate && <span className="review-modal-date">{post.watchDate}</span>}
+                        </div>
+                    </div>
+
+                    {post.review
+                        ? <p className="review-modal-text">{post.review}</p>
+                        : <p className="review-modal-text review-modal-empty">No written review.</p>}
+
+                    <footer className="review-modal-foot">
+                        <button
+                            type="button"
+                            className={`rev-like-button${post.likedByMe ? ' liked' : ''}`}
+                            onClick={() => handleLike(post)}
+                            title={post.likedByMe ? 'Unlike this review' : 'Like this review'}
+                        >
+                            <span className="rev-like-heart">{post.likedByMe ? '♥' : '♡'}</span>
+                            <span className="rev-like-count">{post.likeCount || 0}</span>
+                        </button>
+                    </footer>
+                </div>
+            </div>
         );
     };
 
@@ -196,6 +300,7 @@ export default function ReviewsPage() {
                     )}
                 </section>
             </div>
+            {renderModal()}
         </div>
     );
 }
