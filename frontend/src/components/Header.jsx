@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { PlusCircle, Bell, LogOut } from 'lucide-react'; // 🟢 შემოვიტანეთ LogOut აიქონი
 import LogModal from './LogModal';
 import '../style/Header.css';
+import logoImg from '../assets/Asset1.png'; // 🟢 შემოგვაქვს ლოგოს ფოტო src საქაღალდიდან (შეასწორეთ გზა საჭიროებისამებრ)
 
 export default function Header() {
     const navigate = useNavigate();
@@ -144,7 +145,14 @@ export default function Header() {
         <header className="main-header">
             <div className="header-container">
                 <div className="header-left">
-                    <Link to="/" className="header-logo">LOGO</Link>
+                    {/* 🟢 ტექსტი ჩანაცვლდა img თეგით */}
+                    <Link to="/" className="header-logo">
+                        <img
+                            src={logoImg}
+                            alt="Logo"
+                            style={{ height: '35px', width: 'auto', display: 'block' }}
+                        />
+                    </Link>
                     <nav className="header-nav">
                         <Link to="/shows" className="nav-item">TV Series</Link>
                         <Link to="/lists" className="nav-item">Lists</Link>

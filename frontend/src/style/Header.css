@@ -12,6 +12,16 @@
     width: 100%;
 }
 
+/* ლოგოს ჰოვერ ეფექტი */
+.header-logo img {
+    transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.header-logo img:hover {
+    transform: scale(1.02); /* ოდნავ ადიდებს */
+    filter: drop-shadow(0 0 3px rgba(0, 255, 213, 0.6)); /* აძლევს ნეონის ნათებას, ისეთივეს როგორიც ბელს აქვს */
+}
+
 .header-container {
     max-width: 1200px;
     margin: 0 auto;
