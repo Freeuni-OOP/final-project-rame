@@ -107,6 +107,7 @@ public class ReviewControllerTest {
     // 4. POST /api/reviews/like — toggle on: liked=true, likeCount=1
     @Test
     void toggleLike_firstTime_returnsLikedTrue() throws Exception {
+        // ვიღებთ episode-ის row id-ს
         var eps = episodeStatusRepository.findByUserIdAndShowId(
                 userRepository.findByUsername(USERNAME).get().getId(), SHOW_ID);
         Long epId = eps.get(0).getId();

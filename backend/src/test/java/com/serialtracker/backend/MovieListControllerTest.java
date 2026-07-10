@@ -1,7 +1,5 @@
 package com.serialtracker.backend;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.serialtracker.backend.entity.User;
 import com.serialtracker.backend.repository.MovieListLikeRepository;
 import com.serialtracker.backend.repository.MovieListRepository;
@@ -16,6 +14,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -61,7 +63,7 @@ public class MovieListControllerTest {
         listId = body.get("id").asLong();
     }
 
-    // 1. GET /api/lists/{id} — username-ის გარეშე, likedByMe=false
+    // 1. GET /api/lists/{id} — ჩვეულებრივ ბრუნდება, likedByMe=false username-ის გარეშე
     @Test
     void getList_noUsername_likedByMeFalse() throws Exception {
         mockMvc.perform(get("/api/lists/" + listId))
@@ -149,7 +151,7 @@ public class MovieListControllerTest {
                 .andExpect(jsonPath("$[*].id", hasItem(listId.intValue())));
     }
 
-    // 8. owner თვითონ ალაიქებს საკუთარ სიას — likedByMe=true
+    // 8. OwnerUsername-ის likedByMe — owner თვითონ ალაიქებს, სწორად ჩანს
     @Test
     void getList_ownerLikesOwnList_likedByMeTrue() throws Exception {
         mockMvc.perform(post("/api/lists/" + listId + "/like")

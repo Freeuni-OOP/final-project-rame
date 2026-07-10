@@ -12,6 +12,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -142,10 +143,12 @@ public class FavoriteShowControllerTest {
                 .andExpect(jsonPath("$", hasSize(5)));
     }
 
-    // 8. არარსებული იუზერი → 500 (RuntimeException)
+    // 8. არარსებული იუზერი → RuntimeException
     @Test
-    void getFavorites_unknownUser_throws() throws Exception {
-        mockMvc.perform(get("/api/favorites").param("username", "ghost_user_xyz"))
-                .andExpect(status().is5xxServerError());
+    void getFavorites_unknownUser_throws() {
+        assertThatThrownBy(() ->
+                mockMvc.perform(get("/api/favorites").param("username", "ghost_user_xyz"))
+        ).hasCauseInstanceOf(RuntimeException.class)
+                .hasMessageContaining("User not found");
     }
 }
