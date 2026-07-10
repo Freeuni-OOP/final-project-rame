@@ -31,6 +31,9 @@ export default function ListDetailPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
+    const [liked, setLiked] = useState(false);
+    const [likeCount, setLikeCount] = useState(0);
+
     const [showInfoCache, setShowInfoCache] = useState({});
     const requestedShowIds = useRef(new Set());
 
@@ -68,10 +71,12 @@ export default function ListDetailPage() {
     useEffect(() => {
         setLoading(true);
         setError('');
-        fetch(`${LISTS_BASE_URL}/${id}`, { headers: authHeaders })
+        fetch(`${LISTS_BASE_URL}/${id}${username ? `?username=${username}` : ''}`, { headers: authHeaders })
             .then(r => (r.ok ? r.json() : Promise.reject('not found')))
             .then(data => {
                 setList(data);
+                setLiked(data.likedByMe || false);
+                setLikeCount(data.likeCount || 0);
                 const sortedItems = (data.items || []).slice().sort((a, b) => a.position - b.position);
                 setItems(sortedItems);
                 sortedItems.forEach(item => ensureShowInfo(item.showId));
@@ -82,6 +87,20 @@ export default function ListDetailPage() {
     }, [id]);
 
     const isOwner = username && list?.ownerUsername === username;
+
+    const handleToggleLike = () => {
+        if (!username) return;
+        setLiked(prev => !prev);
+        setLikeCount(prev => liked ? prev - 1 : prev + 1);
+        fetch(`${LISTS_BASE_URL}/${id}/like?username=${username}`, {
+            method: 'POST',
+            headers: authHeaders,
+        }).catch(() => {
+            // revert on error
+            setLiked(prev => !prev);
+            setLikeCount(prev => liked ? prev + 1 : prev - 1);
+        });
+    };
 
     if (loading) {
         return (
@@ -127,6 +146,16 @@ export default function ListDetailPage() {
                         <span className="ldp-pill">{list.isPublic ? 'Public' : 'Private'}</span>
                         <span className="ldp-stat">A list by <span className="ldp-owner">{list.ownerUsername}</span></span>
                         <span className="ldp-stat">{items.length} {items.length === 1 ? 'show' : 'shows'}</span>
+                        {username && (
+                            <button
+                                type="button"
+                                className={`ldp-like-btn ${liked ? 'ldp-like-btn-active' : ''}`}
+                                onClick={handleToggleLike}
+                                title={liked ? 'Unlike this list' : 'Like this list'}
+                            >
+                                ♥ {likeCount > 0 && <span className="ldp-like-count">{likeCount}</span>}
+                            </button>
+                        )}
                     </div>
                     {list.description && <p className="ldp-description">{list.description}</p>}
                 </div>

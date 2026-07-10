@@ -138,7 +138,7 @@ export default function FriendsPage() {
 
     return (
         <div className="fp-page">
-            <p className="fp-tagline">Film lovers, critics and friends — find popular members.</p>
+            <p className="fp-tagline">TV show lovers, critics and friends — find popular members.</p>
 
             <main className="fp-main">
                 {!username ? (
@@ -162,7 +162,7 @@ export default function FriendsPage() {
                                                     <Avatar name={name} size={64} />
                                                     <span className="fp-network-name">{name}</span>
                                                     <span className="fp-network-stats">
-                                                        {PLACEHOLDER_FILM_COUNT} films &bull; {PLACEHOLDER_REVIEW_COUNT} reviews
+                                                        {PLACEHOLDER_FILM_COUNT} TV shows &bull; {PLACEHOLDER_REVIEW_COUNT} reviews
                                                     </span>
                                                 </div>
                                                 <div className="fp-poster-row">

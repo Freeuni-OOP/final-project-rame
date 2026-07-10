@@ -7,10 +7,8 @@ const FRIENDS_BASE_URL = 'https://localhost:8443/api/friends';
 // "Films" = number of shows the user has fully watched (COMPLETED),
 // pulled live from the /api/tracking/films-count endpoint.
 
-// No "favorite movies/actors" feature exists on the backend yet, so this
-// tab is entirely fixed placeholder shapes/counts until that data exists.
-const FAVORITE_MOVIES_COUNT = 6;
-const FAVORITE_ACTORS_COUNT = 6;
+// Favorite TV shows live inline on the Profile tab (real, backed by
+// /api/favorites) — there's no separate "Favorites" tab/page.
 
 // Diary is now backed by real logged watch-history (watchDate) from the
 // /api/tracking/diary endpoint. Sort/filter controls are wired to that data.
@@ -18,7 +16,8 @@ const FAVORITE_ACTORS_COUNT = 6;
 // No "likes" feature exists on the backend yet either, so this tab is
 // genuinely empty (no fabricated rows) — just the filter chrome plus an
 // empty state, matching the real "no data yet" situation.
-const LIKES_SUBTABS = ['Films', 'Reviews', 'Lists'];
+const LIKES_FILTERS = ['Rating', 'Decade', 'Genre', 'Service', 'Sort by When Liked'];
+const LIKES_SUBTABS = ['TV Shows', 'Reviews', 'Lists'];
 
 // Watchlist is backed by the real "PLAN_TO_WATCH" show status (set from the
 // star icon on a show/details page). Backend already returns it newest-added
@@ -27,12 +26,11 @@ const POSTER_BASE = 'https://image.tmdb.org/t/p/w342';
 
 // Network tab reuses the real friends/requests/suggestions backend (same
 // endpoints as the old standalone Members/Friends page) so we don't need a
-// separate page for it. Film/review counts per friend and the eye/grid/heart
-// stats on suggestions are still placeholders (no watch/review feature yet).
+// separate page for it. Film/review counts per friend are still placeholders
+// (no watch/review feature aggregation exists yet).
 const NETWORK_FILM_COUNT = 128;
 const NETWORK_REVIEW_COUNT = 34;
 const NETWORK_POSTER_COUNT = 4;
-const NETWORK_SUGGESTION_STATS = { eye: 1240, grid: 18, heart: 326 };
 
 const AVATAR_COLORS = ['#00b4a2', '#e85d75', '#f2b134', '#5b8def', '#9b59b6', '#2ecc71'];
 
@@ -58,22 +56,6 @@ function HeartIcon() {
     return (
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
             <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z" />
-        </svg>
-    );
-}
-
-function EyeIcon() {
-    return (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 5c-7 0-10 7-10 7s3 7 10 7 10-7 10-7-3-7-10-7zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8z" />
-        </svg>
-    );
-}
-
-function GridIcon() {
-    return (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" />
         </svg>
     );
 }
@@ -129,6 +111,7 @@ function DiaryEditModal({ entry, username, token, onClose, onSaved }) {
     const [liked, setLiked] = useState(!!entry.liked);
     const [rewatch, setRewatch] = useState(!!entry.rewatch);
     const [saving, setSaving] = useState(false);
+    const [activeTab, setActiveTab] = useState('menu'); // 'menu', 'picture', 'username', 'password'
 
     const epLabel = (entry.seasonNumber != null && entry.episodeNumber != null)
         ? ` S${entry.seasonNumber}E${entry.episodeNumber}` : '';
@@ -212,7 +195,7 @@ export default function ProfilePage() {
     const [filmsCount, setFilmsCount] = useState(0);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('profile');
-    const [likesSubTab, setLikesSubTab] = useState('Films');
+    const [likesSubTab, setLikesSubTab] = useState('TV Shows');
     const [activities, setActivities] = useState([]);
 
     const [friends, setFriends] = useState([]);
@@ -226,6 +209,14 @@ export default function ProfilePage() {
 
     const [watchlistShowIds, setWatchlistShowIds] = useState([]);
     const [watchlistInfo, setWatchlistInfo] = useState({});
+    const [friendPosterIds, setFriendPosterIds] = useState({}); // username -> [showId,...] (Network tab-ის რეალური ფოტოებისთვის)
+
+    // Favorite TV Shows — მაქს. 5, ხელით არჩეული (+ დამატების search)
+    const [favoriteShowIds, setFavoriteShowIds] = useState([]);
+    const [favSearch, setFavSearch] = useState('');
+    const [favResults, setFavResults] = useState([]);
+    const [favError, setFavError] = useState('');
+
     const [likedShows, setLikedShows] = useState([]); // Likes tab — [{showId, rating}], ბოლო-პირველი
     const [likesSort, setLikesSort] = useState('liked-desc'); // liked-desc|liked-asc|rating-desc|rating-asc
     const [likesDecade, setLikesDecade] = useState('');
@@ -235,9 +226,88 @@ export default function ProfilePage() {
     const [diaryEntries, setDiaryEntries] = useState([]);
     const [diarySort, setDiarySort] = useState('date-desc'); // date-desc | date-asc | rating-desc | rating-asc
     const [diaryYear, setDiaryYear] = useState('');
+    const [diaryStatus, setDiaryStatus] = useState('');
     const [diaryDecade, setDiaryDecade] = useState('');
     const [diaryGenre, setDiaryGenre] = useState('');
     const [editingEntry, setEditingEntry] = useState(null); // Diary-ს რომელ ჩანაწერს ვასწორებთ
+
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [newUsername, setNewUsername] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [selectedFile, setSelectedFile] = useState(null);
+    const [profilePicBase64, setProfilePicBase64] = useState(null);
+
+    const handleFileChange = (e) => {
+        setSelectedFile(e.target.files[0]);
+    };
+
+
+    const handleSaveChanges = (e) => {
+        e.preventDefault();
+
+        const rawToken = localStorage.getItem('token');
+        let cleanToken = rawToken ? (JSON.parse(rawToken).token || rawToken) : '';
+
+        const myHeaders = new Headers();
+        myHeaders.append("Authorization", `Bearer ${cleanToken}`);
+
+        const formData = new FormData();
+        formData.append('currentUsername', username); // მიმდინარე სახელი სულ სჭირდება ბექენდს იდენტიფიკაციისთვის
+
+        // 🟢 ბექენდს ვუგზავნით მხოლოდ იმას, რაც აქტიურ ტაბშია არჩეული
+        if (activeTab === 'username' && newUsername) {
+            formData.append('newUsername', newUsername);
+        } else if (activeTab === 'password' && newPassword) {
+            formData.append('password', newPassword);
+        } else if (activeTab === 'picture' && selectedFile) {
+            formData.append('profilePicture', selectedFile);
+        } else {
+            alert("Please fill out the selected field first.");
+            return;
+        }
+
+        fetch('https://localhost:8443/api/auth/profile', {
+            method: 'PUT',
+            headers: myHeaders,
+            body: formData
+        })
+            .then(async res => {
+                if (!res.ok) {
+                    const txt = await res.text();
+                    throw new Error(txt || 'Update failed');
+                }
+                return res.json();
+            })
+            .then(data => {
+                setShowEditModal(false);
+                setActiveTab('menu'); // მოდალის დახურვისას მენიუ ვამყოფოთ საწყის პოზიციაზე
+
+                if (data.usernameChanged) {
+                    alert('Username changed successfully! Please log in again with your new username.');
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('userAvatar'); // ძველი ფოტოს წაშლა
+                    navigate('/login');
+                } else {
+                    // 🟢 თუ იუზერმა აირჩია და შეცვალა ფოტო, ინახება local-შიც
+                    if (selectedFile) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                            localStorage.setItem('userAvatar', reader.result); // ინახავს Base64 სტრინგს
+                            alert('Updated successfully!');
+                            window.location.reload(); // რეფრეში, რომ ყველამ დაინახოს
+                        };
+                        reader.readAsDataURL(selectedFile);
+                    } else {
+                        alert('Updated successfully!');
+                        window.location.reload();
+                    }
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Failed to update: ' + err.message);
+            });
+    };
 
     const tokenObj = localStorage.getItem('token');
     const token = tokenObj ? JSON.parse(tokenObj).token : null;
@@ -259,53 +329,84 @@ export default function ProfilePage() {
 
         const authHeaders = { Authorization: `Bearer ${token}` };
 
-        // საჯარო მონაცემი (ნებისმიერი იუზერის): მეგობრები + watchlist + diary
+        // საჯარო მონაცემი (ნებისმიერი იუზერის): პროფილის ინფორმაცია + მეგობრები + watchlist + diary + აქტივობები + ლაიქები + ფავორიტები
         const publicCalls = [
+            fetch(`https://localhost:8443/api/auth/user/${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : null)),
             fetch(`${FRIENDS_BASE_URL}?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`https://localhost:8443/api/tracking/watchlist?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`https://localhost:8443/api/tracking/diary?username=${username}&viewer=${currentUsername || ''}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+            currentUsername
+                ? fetch(`${FRIENDS_BASE_URL}/suggestions?actingUsername=${currentUsername}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : []))
+                : Promise.resolve([]),
+            fetch(`https://localhost:8443/api/tracking/activity?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`https://localhost:8443/api/tracking/likes?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`https://localhost:8443/api/tracking/films-count?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : 0)),
+            fetch(`https://localhost:8443/api/favorites?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
         ];
 
-        // Private data (own profile only)
+        // პირადი მონაცემები (მხოლოდ საკუთარი პროფილისთვის)
         const privateCalls = isOwnProfile ? [
             fetch(`${FRIENDS_BASE_URL}/pending?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`${FRIENDS_BASE_URL}/sent?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-            fetch(`${FRIENDS_BASE_URL}/suggestions?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`https://localhost:8443/api/tracking/recommendations?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-            fetch(`https://localhost:8443/api/tracking/activity?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : []))
         ] : [];
 
         Promise.all([...publicCalls, ...privateCalls])
-    .then(([friendsList, watchlistIds, diaryList, likedIds = [], filmsCountVal = 0,pendingList = [], sentlist = [], suggestionslist = [], recsList = [], activityList = []]) => {
+            .then(([
+                       userObj,
+                       friendsList,
+                       watchlistIds,
+                       diaryList,
+                       suggestionslist = [],
+                       activityList = [],
+                       likedIds = [],
+                       filmsCountVal = 0,
+                       favIds = [],
+                       pendingList = [],
+                       sentlist = [],
+                       recsList = []
+                   ]) => {
 
+                // 🟢 პროფილის სურათის დამუშავება
+                if (userObj && userObj.profilePicture) {
+                    setProfilePicBase64(`data:image/jpeg;base64,${userObj.profilePicture}`);
+                } else {
+                    setProfilePicBase64(null);
+                }
 
-        setFriends(friendsList || []);
-        setFriendsCount((friendsList || []).length);
-        setFilmsCount(Number(filmsCountVal) || 0);
-        setWatchlistShowIds(watchlistIds || []);
-        (watchlistIds || []).forEach(ensureWatchlistShowInfo);
+                setFriends(friendsList || []);
+                setFriendsCount((friendsList || []).length);
+                setFilmsCount(Number(filmsCountVal) || 0);
 
-        setLikedShows(likedIds || []);
-        (likedIds || []).forEach(it => ensureWatchlistShowInfo(it.showId));
+                setWatchlistShowIds(watchlistIds || []);
+                (watchlistIds || []).forEach(ensureWatchlistShowInfo);
 
-        setDiaryEntries(diaryList || []);
-        (diaryList || []).forEach(e => ensureWatchlistShowInfo(e.showId));
+                setFavoriteShowIds(favIds || []);
+                (favIds || []).forEach(ensureWatchlistShowInfo);
 
-        if (isOwnProfile) {
-            setPending(pendingList || []);
-            setSent(sentlist || []);
-            setSuggestions(suggestionslist || []);
-            setRecommendations(recsList || []);
-            setActivities((activityList || []).sort((a, b) => b.id - a.id));
-        }
-    })
+                setLikedShows(likedIds || []);
+                (likedIds || []).forEach(it => ensureWatchlistShowInfo(it.showId));
+
+                setDiaryEntries(diaryList || []);
+                (diaryList || []).forEach(e => ensureWatchlistShowInfo(e.showId));
+
+                setSuggestions(suggestionslist || []);
+                setActivities((activityList || []).sort((a, b) => b.id - a.id));
+
+                if (isOwnProfile) {
+                    setPending(pendingList || []);
+                    setSent(sentlist || []);
+                    setRecommendations(recsList || []);
+                } else {
+                    setPending([]);
+                    setSent([]);
+                    setRecommendations([]);
+                }
+            }) // 🟢 აი აქ გასწორდა ფრჩხილი })-ზე
             .catch(err => console.error("Error loading profile data:", err))
             .finally(() => setLoading(false));
     };
-
-    // Mirrors ListDetailPage's per-show info fetch: the watchlist endpoint
+// Mirrors ListDetailPage's per-show info fetch: the watchlist endpoint
     // only returns raw showIds, so poster/title come from a per-id lookup,
     // cached so repeat renders/tab switches don't refetch.
     const requestedWatchlistIds = useRef(new Set());
@@ -329,11 +430,32 @@ export default function ProfilePage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [token]);
 
+    // Network tab: მეგობრის ბოლოს ნანახი შოუების პოსტერები (Diary-დან, უახლესი პირველი)
+    const requestedFriendPosters = useRef(new Set());
+    const ensureFriendPosters = useCallback((friendUsername) => {
+        if (!friendUsername || requestedFriendPosters.current.has(friendUsername)) return;
+        requestedFriendPosters.current.add(friendUsername);
+        fetch(`https://localhost:8443/api/tracking/diary?username=${friendUsername}`, { headers: authHeaders })
+            .then(r => (r.ok ? r.json() : []))
+            .then(data => {
+                const ids = [...new Set((data || []).map(e => e.showId))].slice(0, NETWORK_POSTER_COUNT);
+                setFriendPosterIds(prev => ({ ...prev, [friendUsername]: ids }));
+                ids.forEach(ensureWatchlistShowInfo);
+            })
+            .catch(() => {});
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [token, ensureWatchlistShowInfo]);
+
+    useEffect(() => {
+        friends.forEach(ensureFriendPosters);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [friends]);
+
     const handleRemoveFromWatchlist = (showId) => {
         if (!username) return;
-        fetch(`https://localhost:8443/api/tracking/show-status?username=${username}&showId=${showId}`, {
+        fetch(`https://localhost:8443/api/tracking/show-status?username=${username}&showId=${showId}&status=${status}...`, {
             method: 'POST',
-            headers: authHeaders,
+            headers: authHeaders
         })
             .then(r => {
                 if (!r.ok) throw new Error('Could not remove from watchlist.');
@@ -342,20 +464,80 @@ export default function ProfilePage() {
             .catch(err => console.error('Error removing from watchlist:', err));
     };
 
+    // ── Favorite TV Shows: search + add + remove ──
+    useEffect(() => {
+        if (favSearch.trim().length === 0) { setFavResults([]); return; }
+        const id = setTimeout(() => {
+            fetch(`https://localhost:8443/api/shows/search?query=${encodeURIComponent(favSearch)}&page=1`)
+                .then(r => (r.ok ? r.json() : null))
+                .then(data => setFavResults(data?.results || []))
+                .catch(() => setFavResults([]));
+        }, 300);
+        return () => clearTimeout(id);
+    }, [favSearch]);
+
+    const addFavorite = (show) => {
+        if (!currentUsername || !show?.id) return;
+        setFavError('');
+        fetch(`https://localhost:8443/api/favorites?username=${currentUsername}&showId=${show.id}`, {
+            method: 'POST',
+            headers: authHeaders,
+        })
+            .then(r => (r.ok ? r.json() : r.text().then(m => Promise.reject(m))))
+            .then(ids => {
+                setFavoriteShowIds(ids || []);
+                (ids || []).forEach(ensureWatchlistShowInfo);
+                setFavSearch('');
+                setFavResults([]);
+            })
+            .catch(msg => setFavError(typeof msg === 'string' ? msg : 'Could not add favorite.'));
+    };
+
+    const removeFavorite = (showId) => {
+        if (!currentUsername) return;
+        setFavError('');
+        fetch(`https://localhost:8443/api/favorites?username=${currentUsername}&showId=${showId}`, {
+            method: 'DELETE',
+            headers: authHeaders,
+        })
+            .then(r => (r.ok ? r.json() : []))
+            .then(ids => setFavoriteShowIds(ids || []))
+            .catch(err => console.error('Remove favorite failed:', err));
+    };
+
+    // ახალ პროფილზე გადასვლისას (network-დან სხვისი პროფილის გახსნისას):
+    // 1) ყოველთვის "Profile" ტაბით დავიწყოთ; 2) ძველი პროფილის მონაცემი გავასუფთაოთ,
+    // რომ ახალის ჩატვირთვამდე წამით არ გამოჩნდეს.
+    useEffect(() => {
+        setActiveTab('profile');
+        setActivities([]);
+        setFriends([]);
+        setFriendsCount(0);
+        setWatchlistShowIds([]);
+        setDiaryEntries([]);
+        setPending([]);
+        setSent([]);
+        setRecommendations([]);
+    }, [routeUsername]);
+
     useEffect(() => {
         if (!username) {
             setLoading(false);
             return;
         }
+        setNewUsername(username);
+
         loadAll();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [username]);
 
     const handleSendRequest = (targetUsername) => {
         const recipient = (targetUsername || addUsername).trim();
-        if (!recipient) return;
+        if (!recipient || !currentUsername) return;
         setPanelMessage('');
-        fetch(`${FRIENDS_BASE_URL}/request?actingUsername=${username}&targetUsername=${recipient}`, {
+        // ყოველთვის შემხედველის (currentUsername) სახელით იგზავნება — თუნდაც
+        // "People you may know" სხვისი პროფილიდან იყოს გახსნილი
+        fetch(`${FRIENDS_BASE_URL}/request?actingUsername=${currentUsername}&targetUsername=${recipient}`, {
             method: 'POST',
             headers: authHeaders,
         })
@@ -411,11 +593,20 @@ export default function ProfilePage() {
         .filter(d => !diaryYear || (d.watchDate || '').slice(0, 4) === diaryYear)
         .filter(d => !diaryDecade || decadeOf(d.released) === diaryDecade)
         .filter(d => !diaryGenre || d.genres.includes(diaryGenre))
+        .filter(d => !diaryStatus || d.status === diaryStatus)
         .sort((a, b) => {
-            if (diarySort === 'date-asc') return (a.watchDate || '').localeCompare(b.watchDate || '');
+            if (diarySort === 'date-asc') {
+                const dateCompare = (a.watchDate || '').localeCompare(b.watchDate || '');
+                if (dateCompare !== 0) return dateCompare;
+                return (a.reviewId || 0) - (b.reviewId || 0); // თუ თარიღი ტოლია, უფრო ძველი (პატარა ID) პირველი
+            }
             if (diarySort === 'rating-desc') return (b.rating || 0) - (a.rating || 0);
             if (diarySort === 'rating-asc') return (a.rating || 0) - (b.rating || 0);
-            return (b.watchDate || '').localeCompare(a.watchDate || ''); // date-desc (default)
+
+            // date-desc (Default - ახალი პირველი):
+            const dateCompare = (b.watchDate || '').localeCompare(a.watchDate || '');
+            if (dateCompare !== 0) return dateCompare;
+            return (b.reviewId || 0) - (a.reviewId || 0); // თუ თარიღი ტოლია, უფრო ახალი (დიდი ID) პირველი
         });
 
     // სხვისი diary-ჩანაწერის (რევიუს) ლაიქის toggle
@@ -478,22 +669,183 @@ export default function ProfilePage() {
             <main className="pp-main">
                 <section className="pp-header-section">
                     <div className="pp-header-left">
-                        <Avatar name={username} size={110} />
+                        {/* 🟢 აქ ჩაჯდა ფოტოს შემოწმების ლოგიკა */}
+                        {profilePicBase64 ? (
+                            <img
+                                src={profilePicBase64}
+                                alt={username}
+                                style={{
+                                    width: '110px',
+                                    height: '110px',
+                                    borderRadius: '50%',
+                                    objectFit: 'cover',
+                                    border: '2px solid rgba(255,255,255,0.1)'
+                                }}
+                            />
+                        ) : (
+                            <Avatar name={username} size={110} />
+                        )}
+
                         <div className="pp-header-info">
                             <h1 className="pp-display-name">{username}</h1>
                             {isOwnProfile && (
                                 <div className="pp-header-actions">
-                                    <button className="pp-edit-btn">Edit Profile</button>
+                                    <button
+                                        className="pp-edit-btn"
+                                        onClick={() => {
+                                            setActiveTab('menu'); // 🟢 ყოველთვის აბრუნებს საწყის მენიუზე გახსნისას
+                                            setShowEditModal(true);
+                                        }}
+                                    >
+                                        Edit Profile
+                                    </button>
                                     <button className="pp-more-btn" aria-label="More options">&hellip;</button>
                                 </div>
                             )}
                         </div>
                     </div>
 
+                    {/* 🟢 EDIT PROFILE მოდალური ფანჯარა */}
+                    {showEditModal && (
+                        <div className="modal-overlay" style={{
+                            position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+                            backgroundColor: 'rgba(0, 0, 0, 0.7)', display: 'flex',
+                            justifyContent: 'center', alignItems: 'center', zIndex: 1000
+                        }}>
+                            <div className="modal-content" style={{
+                                backgroundColor: '#1e1e1e', color: '#fff', padding: '30px',
+                                borderRadius: '12px', width: '100%', MarianWidth: '400px',
+                                boxShadow: '0 8px 24px rgba(0,0,0,0.5)', fontFamily: 'sans-serif'
+                            }}>
+                                <div className="modal-header" style={{
+                                    display: 'flex', justifyContent: 'space-between',
+                                    alignItems: 'center', marginBottom: '20px'
+                                }}>
+                                    <h2 style={{ margin: 0, fontSize: '22px', fontWeight: '600' }}>Edit Profile</h2>
+                                    <button
+                                        type="button"
+                                        className="close-btn"
+                                        onClick={() => {
+                                            setShowEditModal(false); setActiveTab('menu');
+                                        }}
+                                        style={{ background: 'none', border: 'none', color: '#888', fontSize: '20px', cursor: 'pointer' }}
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+
+                                <form onSubmit={handleSaveChanges}>
+                                    {/* 1. საწყისი არჩევანის მენიუ */}
+                                    {activeTab === 'menu' && (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '10px 0 20px 0' }}>
+                                            <p style={{ color: '#aaa', fontSize: '14px', marginBottom: '10px', textAlign: 'center' }}>
+                                                Select the setting you want to update:
+                                            </p>
+
+                                            <button type="button" onClick={() => setActiveTab('picture')} className="edit-menu-btn">
+                                                Change Profile Picture
+                                            </button>
+
+                                            <button type="button" onClick={() => setActiveTab('username')} className="edit-menu-btn">
+                                                Change Username
+                                            </button>
+
+                                            <button type="button" onClick={() => setActiveTab('password')} className="edit-menu-btn">
+                                                Change Password
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* 2. ფოტოს შეცვლის ფანჯარა */}
+                                    {activeTab === 'picture' && (
+                                        <div style={{ padding: '10px 0 20px 0' }}>
+                                            <label style={{ display: 'block', marginBottom: '8px', color: '#aaa', fontSize: '14px' }}>
+                                                Upload New Profile Picture
+                                            </label>
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={(e) => setSelectedFile(e.target.files[0])}
+                                                style={{ color: '#ccc', width: '100%', padding: '10px 0' }}
+                                                required
+                                            />
+                                        </div>
+                                    )}
+
+                                    {/* 3. იუზერნეიმის შეცვლის ფანჯარა */}
+                                    {activeTab === 'username' && (
+                                        <div style={{ padding: '10px 0 20px 0' }}>
+                                            <label style={{ display: 'block', marginBottom: '8px', color: '#aaa', fontSize: '14px' }}>
+                                                New Username
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={newUsername}
+                                                onChange={(e) => setNewUsername(e.target.value)}
+                                                placeholder="Enter username"
+                                                className="edit-modal-input"
+                                                required
+                                            />
+                                        </div>
+                                    )}
+
+                                    {/* 4. პაროლის შეცვლის ფანჯარა */}
+                                    {activeTab === 'password' && (
+                                        <div style={{ padding: '10px 0 20px 0' }}>
+                                            <label style={{ display: 'block', marginBottom: '8px', color: '#aaa', fontSize: '14px' }}>
+                                                New Password
+                                            </label>
+                                            <input
+                                                type="password"
+                                                value={newPassword}
+                                                onChange={(e) => setNewPassword(e.target.value)}
+                                                placeholder="Enter new password"
+                                                className="edit-modal-input"
+                                                required
+                                            />
+                                        </div>
+                                    )}
+
+                                    {/* ქვედა სამოქმედო ღილაკები */}
+                                    <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
+                                        {activeTab !== 'menu' ? (
+                                            <>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setActiveTab('menu')}
+                                                    className="edit-action-btn edit-btn-back"
+                                                >
+                                                    Back
+                                                </button>
+                                                <button
+                                                    type="submit"
+                                                    className="edit-action-btn edit-btn-save"
+                                                >
+                                                    Save Changes
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowEditModal(false)}
+                                                className="edit-action-btn edit-btn-cancel"
+                                            >
+                                                Cancel
+                                            </button>
+                                        )}
+                                    </div>
+
+
+
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="pp-stats">
                         <div className="pp-stat-item">
                             <span className="pp-stat-num">{loading ? '–' : filmsCount}</span>
-                            <span className="pp-stat-label">Films</span>
+                            <span className="pp-stat-label">TV Shows</span>
                         </div>
                         <div className="pp-stat-item">
                             <span className="pp-stat-num">{loading ? '–' : friendsCount}</span>
@@ -508,12 +860,6 @@ export default function ProfilePage() {
                         onClick={() => setActiveTab('profile')}
                     >
                         Profile
-                    </span>
-                    <span
-                        className={`pp-tab ${activeTab === 'favorites' ? 'pp-tab-active' : ''}`}
-                        onClick={() => setActiveTab('favorites')}
-                    >
-                        Favorites
                     </span>
                     <span
                         className={`pp-tab ${activeTab === 'diary' ? 'pp-tab-active' : ''}`}
@@ -546,11 +892,86 @@ export default function ProfilePage() {
                         <div className="pp-body-left">
                             <section className="pp-block">
                                 <div className="pp-block-header">
-                                    <span className="pp-block-title">Favorite Films</span>
+                                    <span className="pp-block-title">Favorite TV Shows</span>
+                                    {isOwnProfile && <span className="pp-block-all">{favoriteShowIds.length}/5</span>}
                                 </div>
-                                <p className="pp-favorite-empty">
-                                    Don&apos;t forget to select your <strong>favorite films</strong>!
-                                </p>
+
+                                {favoriteShowIds.length > 0 && (
+                                    <div className="pp-fav-shows-row">
+                                        {favoriteShowIds.map((showId) => {
+                                            const info = watchlistInfo[showId];
+                                            return (
+                                                <div key={showId} className="pp-fav-show-item">
+                                                    {info?.poster_path ? (
+                                                        <img
+                                                            src={`${POSTER_BASE}${info.poster_path}`}
+                                                            alt={info?.name || ''}
+                                                            className="pp-fav-show-poster"
+                                                            onClick={() => navigate(`/shows/${showId}`)}
+                                                        />
+                                                    ) : (
+                                                        <div
+                                                            className="pp-fav-show-poster pp-fav-show-placeholder"
+                                                            onClick={() => navigate(`/shows/${showId}`)}
+                                                        />
+                                                    )}
+                                                    {isOwnProfile && (
+                                                        <button
+                                                            type="button"
+                                                            className="pp-fav-remove"
+                                                            title="Remove from favorites"
+                                                            onClick={() => removeFavorite(showId)}
+                                                        >
+                                                            ×
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
+                                {isOwnProfile && favoriteShowIds.length < 5 && (
+                                    <div className="pp-fav-add">
+                                        <input
+                                            className="pp-fav-search-input"
+                                            placeholder="Add a TV show..."
+                                            value={favSearch}
+                                            onChange={(e) => setFavSearch(e.target.value)}
+                                        />
+                                        {favSearch.trim() && favResults.length > 0 && (
+                                            <div className="pp-fav-search-results">
+                                                {favResults.slice(0, 6).map((show) => (
+                                                    <div
+                                                        key={show.id}
+                                                        className="pp-fav-search-item"
+                                                        onClick={() => addFavorite(show)}
+                                                    >
+                                                        {show.poster_path ? (
+                                                            <img
+                                                                src={`https://image.tmdb.org/t/p/w92${show.poster_path}`}
+                                                                alt=""
+                                                                className="pp-fav-search-thumb"
+                                                            />
+                                                        ) : (
+                                                            <span className="pp-fav-search-thumb" />
+                                                        )}
+                                                        <span className="pp-fav-search-name">
+                                                            {show.name || show.title}
+                                                            {show.first_air_date ? ` (${show.first_air_date.slice(0, 4)})` : ''}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {favError && <p className="pp-fav-error">{favError}</p>}
+
+                                {favoriteShowIds.length === 0 && !isOwnProfile && (
+                                    <p className="pp-favorite-empty">No favorite TV shows yet.</p>
+                                )}
                             </section>
 
                             {isOwnProfile && (
@@ -752,7 +1173,7 @@ export default function ProfilePage() {
                                                         )}
                                                     </div>
                                                 </div>
-                                            );
+                                            );f
                                         });
                                     })()}
                                 </div>
@@ -789,35 +1210,6 @@ export default function ProfilePage() {
                             </div>
                         )}
                     </div>
-                ) : activeTab === 'favorites' ? (
-                    <div className="pp-favorites">
-                        <div className="pp-favorites-header">
-                            <h2 className="pp-favorites-title">Favorites</h2>
-                            <div className="pp-favorites-actions">
-                                <button className="pp-fav-icon-btn" aria-label="Download">⬇</button>
-                                <button className="pp-fav-icon-btn" aria-label="Share">↗</button>
-                                <button className="pp-fav-all-btn">All Favorites</button>
-                            </div>
-                        </div>
-
-                        <section className="pp-fav-section">
-                            <div className="pp-fav-section-title">Movies ({FAVORITE_MOVIES_COUNT})</div>
-                            <div className="pp-fav-grid">
-                                {Array.from({ length: FAVORITE_MOVIES_COUNT }).map((_, i) => (
-                                    <div key={i} className="pp-fav-poster" />
-                                ))}
-                            </div>
-                        </section>
-
-                        <section className="pp-fav-section">
-                            <div className="pp-fav-section-title">Actors ({FAVORITE_ACTORS_COUNT})</div>
-                            <div className="pp-fav-grid">
-                                {Array.from({ length: FAVORITE_ACTORS_COUNT }).map((_, i) => (
-                                    <div key={i} className="pp-fav-actor" />
-                                ))}
-                            </div>
-                        </section>
-                    </div>
                 ) : activeTab === 'diary' ? (
                     <div className="pp-diary">
                         <div className="pp-diary-header">
@@ -833,6 +1225,12 @@ export default function ProfilePage() {
                                 <DiaryDropdown label="Year" value={diaryYear} options={diaryYears} onChange={setDiaryYear} />
                                 <DiaryDropdown label="Decade" value={diaryDecade} options={diaryDecades} onChange={setDiaryDecade} />
                                 <DiaryDropdown label="Genre" value={diaryGenre} options={diaryGenres} onChange={setDiaryGenre} />
+                                <DiaryDropdown
+                                    label="Status"
+                                    value={diaryStatus}
+                                    options={['COMPLETED', 'WATCHING', 'PLAN_TO_WATCH', 'DROPPED']}
+                                    onChange={setDiaryStatus}
+                                />
                                 <span
                                     className="pp-diary-filter"
                                     style={{ cursor: 'pointer', color: diarySort.startsWith('date') ? '#00b4a2' : undefined }}
@@ -853,7 +1251,7 @@ export default function ProfilePage() {
                             <div className="pp-diary-table">
                                 <div className="pp-diary-row pp-diary-row-head">
                                     <span className="pp-diary-col-date">Date</span>
-                                    <span className="pp-diary-col-film">Film</span>
+                                    <span className="pp-diary-col-film">Show</span>
                                     <span className="pp-diary-col-released">Released</span>
                                     <span className="pp-diary-col-rating">Rating</span>
                                     <span className="pp-diary-col-like">Like</span>
@@ -868,70 +1266,103 @@ export default function ProfilePage() {
                                     const epLabel = (entry.seasonNumber != null && entry.episodeNumber != null)
                                         ? ` S${entry.seasonNumber}E${entry.episodeNumber}` : '';
                                     return (
-                                        <div key={`${entry.showId}-${entry.seasonNumber}-${entry.episodeNumber}-${wd}-${i}`} className="pp-diary-row">
+                                        <div key={`${entry.showId}-${wd}-${i}`} className="pp-diary-row">
                                             <span className="pp-diary-col-date">{formatDiaryDate(wd)}</span>
                                             <span className="pp-diary-col-film pp-diary-film-cell">
-                                                {entry.poster_path ? (
-                                                    <img
-                                                        src={`${POSTER_BASE}${entry.poster_path}`}
-                                                        alt={entry.title}
-                                                        className="pp-diary-poster"
-                                                        style={{ cursor: 'pointer', objectFit: 'cover' }}
-                                                        onClick={() => navigate(`/shows/${entry.showId}`)}
-                                                    />
-                                                ) : (
-                                                    <span className="pp-diary-poster" />
-                                                )}
-                                                <span
-                                                    className="pp-diary-film-title"
-                                                    style={{ cursor: 'pointer' }}
-                                                    onClick={() => navigate(`/shows/${entry.showId}`)}
-                                                >
-                                                    {entry.title}{epLabel}
-                                                </span>
-                                            </span>
+        {entry.poster_path ? (
+            <img
+                src={`${POSTER_BASE}${entry.poster_path}`}
+                alt={entry.title}
+                className="pp-diary-poster"
+                style={{ cursor: 'pointer', objectFit: 'cover' }}
+                onClick={() => navigate(`/shows/${entry.showId}`)}
+            />
+        ) : (
+            <span className="pp-diary-poster" />
+        )}
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
+            <span
+                className="pp-diary-film-title"
+                style={{ cursor: 'pointer', fontWeight: '600' }}
+                onClick={() => navigate(`/shows/${entry.showId}`)}
+            >
+                {entry.title}
+            </span>
+                                                    {entry.status && (
+                                                        <span style={{
+                                                            padding: '2px 8px',
+                                                            borderRadius: '4px',
+                                                            fontSize: '10px',
+                                                            fontWeight: 'bold',
+                                                            textTransform: 'uppercase',
+                                                            letterSpacing: '0.5px',
+                                                            background:
+                                                                entry.status === 'COMPLETED' ? 'rgba(46, 204, 113, 0.15)' :
+                                                                    entry.status === 'WATCHING' ? 'rgba(91, 141, 239, 0.15)' :
+                                                                        entry.status === 'PLAN_TO_WATCH' ? 'rgba(242, 177, 52, 0.15)' :
+                                                                            'rgba(232, 93, 117, 0.15)', // DROPPED
+                                                            color:
+                                                                entry.status === 'COMPLETED' ? '#2ecc71' :
+                                                                    entry.status === 'WATCHING' ? '#5b8def' :
+                                                                        entry.status === 'PLAN_TO_WATCH' ? '#f2b134' :
+                                                                            '#e85d75',
+                                                            border: `1px solid ${
+                                                                entry.status === 'COMPLETED' ? 'rgba(46, 204, 113, 0.3)' :
+                                                                    entry.status === 'WATCHING' ? 'rgba(91, 141, 239, 0.3)' :
+                                                                        entry.status === 'PLAN_TO_WATCH' ? 'rgba(242, 177, 52, 0.3)' :
+                                                                            'rgba(232, 93, 117, 0.3)'
+                                                            }`
+                                                        }}>
+                    {entry.status === 'COMPLETED' ? 'Watched' :
+                        entry.status === 'WATCHING' ? 'Watching' :
+                            entry.status === 'PLAN_TO_WATCH' ? 'Plan to Watch' :
+                                entry.status === 'DROPPED' ? 'Dropped' : entry.status.replace(/_/g, ' ')}
+                </span>
+                                                    )}
+        </div>
+    </span>
                                             <span className="pp-diary-col-released">{entry.released}</span>
                                             <span className="pp-diary-col-rating pp-diary-stars">
-                                                <span className="pp-diary-stars-filled">{'★'.repeat(rating)}</span>
-                                                <span className="pp-diary-stars-empty">{'★'.repeat(5 - rating)}</span>
-                                            </span>
+        <span className="pp-diary-stars-filled">{'★'.repeat(rating)}</span>
+        <span className="pp-diary-stars-empty">{'★'.repeat(5 - rating)}</span>
+    </span>
                                             <span className="pp-diary-col-like">
-                                                {entry.liked && (
-                                                    <span className="pp-diary-heart pp-diary-heart-filled">
-                                                        <HeartIcon />
-                                                    </span>
-                                                )}
-                                            </span>
+        {entry.liked && (
+            <span className="pp-diary-heart pp-diary-heart-filled">
+                <HeartIcon />
+            </span>
+        )}
+    </span>
                                             <span className="pp-diary-col-rewatch">{entry.rewatch ? '↻' : ''}</span>
                                             <span className="pp-diary-col-review" title={entry.review || ''}>
-                                                {entry.review || ''}
-                                            </span>
+        {entry.review || ''}
+    </span>
                                             <span className="pp-diary-col-edit">
-                                                {isOwnProfile ? (
-                                                    <span
-                                                        className="pp-diary-edit-icon"
-                                                        style={{ cursor: 'pointer' }}
-                                                        title="Edit review"
-                                                        onClick={() => setEditingEntry(entry)}
-                                                    >
-                                                        ✎
-                                                    </span>
-                                                ) : (
-                                                    <span
-                                                        className="pp-diary-like-cell"
-                                                        title={entry.likedByMe ? 'Unlike' : 'Like this review'}
-                                                    >
-                                                        <span
-                                                            className="pp-diary-like-heart"
-                                                            style={{ cursor: 'pointer', color: entry.likedByMe ? '#e85d75' : '#5f758a' }}
-                                                            onClick={() => handleDiaryReviewLike(entry)}
-                                                        >
-                                                            {entry.likedByMe ? '♥' : '♡'}
-                                                        </span>
-                                                        <span className="pp-diary-like-count">{entry.likeCount || 0}</span>
-                                                    </span>
-                                                )}
-                                            </span>
+        {isOwnProfile ? (
+            <span
+                className="pp-diary-edit-icon"
+                style={{ cursor: 'pointer' }}
+                title="Edit review"
+                onClick={() => setEditingEntry(entry)}
+            >
+                ✎
+            </span>
+        ) : (
+            <span
+                className="pp-diary-like-cell"
+                title={entry.likedByMe ? 'Unlike' : 'Like this review'}
+            >
+                <span
+                    className="pp-diary-like-heart"
+                    style={{ cursor: 'pointer', color: entry.likedByMe ? '#e85d75' : '#5f758a' }}
+                    onClick={() => handleDiaryReviewLike(entry)}
+                >
+                    {entry.likedByMe ? '♥' : '♡'}
+                </span>
+                <span className="pp-diary-like-count">{entry.likeCount || 0}</span>
+            </span>
+        )}
+    </span>
                                         </div>
                                     );
                                 })}
@@ -1014,11 +1445,11 @@ export default function ProfilePage() {
                     </div>
                 ) : activeTab === 'watchlist' ? (
                     <div className="pp-watchlist-solo">
-                        <div className="pp-watchlist-title">You want to see {watchlistShowIds.length} film{watchlistShowIds.length === 1 ? '' : 's'}</div>
+                        <div className="pp-watchlist-title">You want to see {watchlistShowIds.length} TV show{watchlistShowIds.length === 1 ? '' : 's'}</div>
 
                         {watchlistShowIds.length === 0 ? (
                             <div className="pp-likes-empty-box">
-                                <p className="pp-likes-empty-text">No films yet</p>
+                                <p className="pp-likes-empty-text">No TV shows yet</p>
                             </div>
                         ) : (
                             <div className="pp-watchlist-poster-grid">
@@ -1063,27 +1494,49 @@ export default function ProfilePage() {
                     <div className="pp-network">
                         <div className="pp-network-row">
                             <section className="pp-block pp-network-col">
-                                <div className="pp-kicker">Your Network</div>
+                                <div className="pp-kicker">{isOwnProfile ? 'Your Network' : `${username}'s Network`}</div>
                                 {friends.length === 0 ? (
-                                    <div className="pp-section-empty">You haven&apos;t added any friends yet.</div>
+                                    <div className="pp-section-empty">
+                                        {isOwnProfile ? "You haven't added any friends yet." : `${username} hasn't added any friends yet.`}
+                                    </div>
                                 ) : (
                                     <div className="pp-network-scroll">
-                                        {friends.map((name) => (
-                                            <div key={name} className="pp-network-card">
-                                                <div className="pp-network-card-top">
-                                                    <Avatar name={name} size={64} />
-                                                    <span className="pp-network-name">{name}</span>
-                                                    <span className="pp-network-stats">
-                                                        {NETWORK_FILM_COUNT} films &bull; {NETWORK_REVIEW_COUNT} reviews
-                                                    </span>
+                                        {friends.map((name) => {
+                                            const posterIds = friendPosterIds[name] || [];
+                                            return (
+                                                <div key={name} className="pp-network-card">
+                                                    <div
+                                                        className="pp-network-card-top"
+                                                        style={{ cursor: 'pointer' }}
+                                                        onClick={() => navigate(`/profile/${name}`)}
+                                                        title={`View ${name}'s profile`}
+                                                    >
+                                                        <Avatar name={name} size={64} />
+                                                        <span className="pp-network-name">{name}</span>
+                                                        <span className="pp-network-stats">
+                                                            {NETWORK_FILM_COUNT} TV shows &bull; {NETWORK_REVIEW_COUNT} reviews
+                                                        </span>
+                                                    </div>
+                                                    <div className="pp-poster-row">
+                                                        {Array.from({ length: NETWORK_POSTER_COUNT }).map((_, i) => {
+                                                            const showId = posterIds[i];
+                                                            const info = showId ? watchlistInfo[showId] : null;
+                                                            return info?.poster_path ? (
+                                                                <img
+                                                                    key={i}
+                                                                    src={`${POSTER_BASE}${info.poster_path}`}
+                                                                    alt={info?.name || ''}
+                                                                    className="pp-poster-real"
+                                                                    onClick={() => navigate(`/shows/${showId}`)}
+                                                                />
+                                                            ) : (
+                                                                <div key={i} className="pp-poster-placeholder" />
+                                                            );
+                                                        })}
+                                                    </div>
                                                 </div>
-                                                <div className="pp-poster-row">
-                                                    {Array.from({ length: NETWORK_POSTER_COUNT }).map((_, i) => (
-                                                        <div key={i} className="pp-poster-placeholder" />
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </section>
@@ -1155,7 +1608,7 @@ export default function ProfilePage() {
                             )}
                         </div>
 
-                        {isOwnProfile && (
+                        {currentUsername && (
                             <section className="pp-block">
                                 <div className="pp-kicker">People you may know</div>
                                 {suggestions.length === 0 ? (
@@ -1164,17 +1617,19 @@ export default function ProfilePage() {
                                     <div className="pp-suggestions-list">
                                         {suggestions.map((s) => (
                                             <div key={s.username} className="pp-suggestion-row">
-                                                <Avatar name={s.username} size={44} />
-                                                <div className="pp-suggestion-info">
-                                                    <span className="pp-suggestion-name">{s.username}</span>
-                                                    <span className="pp-suggestion-sub">
-                                                    {s.mutualFriendCount} mutual friend{s.mutualFriendCount === 1 ? '' : 's'}
-                                                </span>
-                                                </div>
-                                                <div className="pp-suggestion-stats">
-                                                    <span className="pp-stat"><EyeIcon /> {NETWORK_SUGGESTION_STATS.eye}</span>
-                                                    <span className="pp-stat"><GridIcon /> {NETWORK_SUGGESTION_STATS.grid}</span>
-                                                    <span className="pp-stat"><HeartIcon /> {NETWORK_SUGGESTION_STATS.heart}</span>
+                                                <div
+                                                    className="pp-suggestion-clickable"
+                                                    style={{ cursor: 'pointer' }}
+                                                    onClick={() => navigate(`/profile/${s.username}`)}
+                                                    title={`View ${s.username}'s profile`}
+                                                >
+                                                    <Avatar name={s.username} size={44} />
+                                                    <div className="pp-suggestion-info">
+                                                        <span className="pp-suggestion-name">{s.username}</span>
+                                                        <span className="pp-suggestion-sub">
+                                                        {s.mutualFriendCount} mutual friend{s.mutualFriendCount === 1 ? '' : 's'}
+                                                    </span>
+                                                    </div>
                                                 </div>
                                                 <button className="pp-add-circle-btn" onClick={() => handleSendRequest(s.username)}>+</button>
                                             </div>
