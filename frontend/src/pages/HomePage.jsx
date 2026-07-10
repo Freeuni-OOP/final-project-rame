@@ -21,6 +21,7 @@ export default function HomePage() {
 
     const [feed, setFeed] = useState([]);
     const [error, setError] = useState(null);
+    const [selectedPost, setSelectedPost] = useState(null); // გახსნილი რივიუს მოდალი
 
     const tokenObj = localStorage.getItem('token');
     const token = tokenObj ? JSON.parse(tokenObj).token : null;
@@ -54,6 +55,14 @@ export default function HomePage() {
         fetchFeed();
     }, [username, token]);
 
+    // Escape ხურავს რივიუს მოდალს
+    useEffect(() => {
+        if (!selectedPost) return;
+        const onKey = (e) => { if (e.key === 'Escape') setSelectedPost(null); };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [selectedPost]);
+
     const handleLike = (post) => {
         if (!username || !post.reviewId) return;
 
@@ -64,11 +73,12 @@ export default function HomePage() {
             .then(res => res.ok ? res.json() : null)
             .then(data => {
                 if (!data) return;
-                setFeed(prev => prev.map(p =>
+                const apply = (p) =>
                     (p.reviewId === post.reviewId && p.reviewType === post.reviewType)
                         ? { ...p, likeCount: data.likeCount, likedByMe: data.liked }
-                        : p
-                ));
+                        : p;
+                setFeed(prev => prev.map(apply));
+                setSelectedPost(prev => (prev ? apply(prev) : prev));
             })
             .catch(err => console.error('Failed to toggle like:', err));
     };
@@ -81,12 +91,19 @@ export default function HomePage() {
             ? `S${post.seasonNumber} E${post.episodeNumber}`
             : null;
 
+        const stop = (fn) => (e) => { e.stopPropagation(); fn(); };
+
         return (
-            <article className="friend-card" key={`${post.reviewType}-${post.reviewId}`}>
+            <article
+                className="friend-card"
+                key={`${post.reviewType}-${post.reviewId}`}
+                onClick={() => setSelectedPost(post)}
+                title="Open review"
+            >
                 <header className="friend-card-head">
                     <div
                         className="friend-avatar"
-                        onClick={() => navigate(`/profile/${post.username}`)}
+                        onClick={stop(() => navigate(`/profile/${post.username}`))}
                         title={`View ${post.username}'s profile`}
                         style={{ backgroundColor: avatarSrc ? 'transparent' : getAvatarColor(post.username) }}
                     >
@@ -94,7 +111,7 @@ export default function HomePage() {
                     </div>
                     <span
                         className="friend-author"
-                        onClick={() => navigate(`/profile/${post.username}`)}
+                        onClick={stop(() => navigate(`/profile/${post.username}`))}
                     >
                         {post.username}
                     </span>
@@ -103,7 +120,7 @@ export default function HomePage() {
                 <div className="friend-card-body">
                     <div
                         className="friend-poster"
-                        onClick={() => navigate(`/shows/${post.showId}`)}
+                        onClick={stop(() => navigate(`/shows/${post.showId}`))}
                         title={post.showName || 'View show'}
                     >
                         {post.posterPath
@@ -114,7 +131,7 @@ export default function HomePage() {
                     <div className="friend-card-info">
                         <span
                             className="friend-show-name"
-                            onClick={() => navigate(`/shows/${post.showId}`)}
+                            onClick={stop(() => navigate(`/shows/${post.showId}`))}
                         >
                             {post.showName || `Show #${post.showId}`}
                         </span>
@@ -135,7 +152,7 @@ export default function HomePage() {
                     <button
                         type="button"
                         className={`feed-like-button${post.likedByMe ? ' liked' : ''}`}
-                        onClick={() => handleLike(post)}
+                        onClick={stop(() => handleLike(post))}
                         title={post.likedByMe ? 'Unlike this review' : 'Like this review'}
                     >
                         <span className="feed-like-heart">{post.likedByMe ? '♥' : '♡'}</span>
@@ -143,6 +160,89 @@ export default function HomePage() {
                     </button>
                 </footer>
             </article>
+        );
+    };
+
+    const renderModal = () => {
+        const post = selectedPost;
+        if (!post) return null;
+
+        const avatarSrc = post.profilePicture ? `data:image/jpeg;base64,${post.profilePicture}` : null;
+        const initial = post.username ? post.username.charAt(0).toUpperCase() : '?';
+        const episodeBadge = post.seasonNumber != null && post.episodeNumber != null
+            ? `S${post.seasonNumber} E${post.episodeNumber}`
+            : null;
+
+        return (
+            <div className="review-modal-overlay" onClick={() => setSelectedPost(null)}>
+                <div className="review-modal" onClick={(e) => e.stopPropagation()}>
+                    <button
+                        type="button"
+                        className="review-modal-close"
+                        onClick={() => setSelectedPost(null)}
+                        title="Close"
+                    >
+                        ×
+                    </button>
+
+                    <header className="review-modal-head">
+                        <div
+                            className="friend-avatar"
+                            onClick={() => navigate(`/profile/${post.username}`)}
+                            title={`View ${post.username}'s profile`}
+                            style={{ backgroundColor: avatarSrc ? 'transparent' : getAvatarColor(post.username) }}
+                        >
+                            {avatarSrc ? <img src={avatarSrc} alt={post.username} /> : initial}
+                        </div>
+                        <span className="friend-author" onClick={() => navigate(`/profile/${post.username}`)}>
+                            {post.username}
+                        </span>
+                    </header>
+
+                    <div className="review-modal-body">
+                        <div
+                            className="review-modal-poster"
+                            onClick={() => navigate(`/shows/${post.showId}`)}
+                            title={post.showName || 'View show'}
+                        >
+                            {post.posterPath
+                                ? <img src={`${POSTER_BASE}${post.posterPath}`} alt={post.showName || 'Poster'} />
+                                : <div className="friend-poster-empty">No poster</div>}
+                        </div>
+
+                        <div className="review-modal-info">
+                            <span className="review-modal-show" onClick={() => navigate(`/shows/${post.showId}`)}>
+                                {post.showName || `Show #${post.showId}`}
+                            </span>
+                            <div className="friend-tags">
+                                {post.rating != null && post.rating > 0 && (
+                                    <span className="feed-stars">{'★'.repeat(post.rating)}</span>
+                                )}
+                                {post.liked && <span className="feed-heart">{'♥'}</span>}
+                                {episodeBadge && <span className="feed-badge">{episodeBadge}</span>}
+                                {post.rewatch && <span className="feed-rewatch">{'↻'} rewatch</span>}
+                            </div>
+                            {post.watchDate && <span className="review-modal-date">{post.watchDate}</span>}
+                        </div>
+                    </div>
+
+                    {post.review
+                        ? <p className="review-modal-text">{post.review}</p>
+                        : <p className="review-modal-text review-modal-empty">No written review.</p>}
+
+                    <footer className="review-modal-foot">
+                        <button
+                            type="button"
+                            className={`feed-like-button${post.likedByMe ? ' liked' : ''}`}
+                            onClick={() => handleLike(post)}
+                            title={post.likedByMe ? 'Unlike this review' : 'Like this review'}
+                        >
+                            <span className="feed-like-heart">{post.likedByMe ? '♥' : '♡'}</span>
+                            <span className="feed-like-count">{post.likeCount || 0}</span>
+                        </button>
+                    </footer>
+                </div>
+            </div>
         );
     };
 
@@ -170,6 +270,7 @@ export default function HomePage() {
                 </section>
             )}
             <ShowsPage />
+            {renderModal()}
         </div>
     );
 }
