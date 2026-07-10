@@ -323,160 +323,90 @@ export default function ProfilePage() {
     const isOwnProfile = !routeUsername || routeUsername === currentUsername;
     const authHeaders = { Authorization: `Bearer ${token}` };
 
-const loadAll = () => {
-const loadAll = () => {
-    if (!username) return;
-    setLoading(true);
+    const loadAll = () => {
+        if (!username) return;
+        setLoading(true);
 
-    const authHeaders = { Authorization: `Bearer ${token}` };
+        const authHeaders = { Authorization: `Bearer ${token}` };
 
-    // საჯარო მონაცემი (ნებისმიერი იუზერის): მეგობრები + watchlist + diary +
-    // "People you may know" — ეს ყოველთვის შემხედველის (currentUsername) შემოთავაზებაა,
-    // ამიტომ ჩანს ნებისმიერი პროფილის Network ტაბზეც, არა მხოლოდ საკუთარზე.
-    const publicCalls = [
-        fetch(`${FRIENDS_BASE_URL}?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-        fetch(`https://localhost:8443/api/tracking/watchlist?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-     
-        fetch(`https://localhost:8443/api/tracking/diary?username=${username}&viewer=${currentUsername || ''}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-        currentUsername
-            ? fetch(`${FRIENDS_BASE_URL}/suggestions?actingUsername=${currentUsername}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : []))
-            : Promise.resolve([]),
-        fetch(`https://localhost:8443/api/tracking/activity?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-        fetch(`https://localhost:8443/api/tracking/likes?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-        fetch(`https://localhost:8443/api/tracking/films-count?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : 0)),
-        fetch(`https://localhost:8443/api/favorites?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-    ];
+        // საჯარო მონაცემი (ნებისმიერი იუზერის): პროფილის ინფორმაცია + მეგობრები + watchlist + diary + აქტივობები + ლაიქები + ფავორიტები
+        const publicCalls = [
+            fetch(`https://localhost:8443/api/auth/user/${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : null)),
+            fetch(`${FRIENDS_BASE_URL}?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+            fetch(`https://localhost:8443/api/tracking/watchlist?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+            fetch(`https://localhost:8443/api/tracking/diary?username=${username}&viewer=${currentUsername || ''}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+            currentUsername
+                ? fetch(`${FRIENDS_BASE_URL}/suggestions?actingUsername=${currentUsername}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : []))
+                : Promise.resolve([]),
+            fetch(`https://localhost:8443/api/tracking/activity?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+            fetch(`https://localhost:8443/api/tracking/likes?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+            fetch(`https://localhost:8443/api/tracking/films-count?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : 0)),
+            fetch(`https://localhost:8443/api/favorites?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+        ];
 
-    // Private data (own profile only) — მოთხოვნები/რეკომენდაციები მხოლოდ საკუთარია
-    const privateCalls = isOwnProfile ? [
-        fetch(`${FRIENDS_BASE_URL}/pending?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-        fetch(`${FRIENDS_BASE_URL}/sent?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-        fetch(`https://localhost:8443/api/tracking/recommendations?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-    ] : [];
+        // პირადი მონაცემები (მხოლოდ საკუთარი პროფილისთვის)
+        const privateCalls = isOwnProfile ? [
+            fetch(`${FRIENDS_BASE_URL}/pending?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+            fetch(`${FRIENDS_BASE_URL}/sent?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+            fetch(`https://localhost:8443/api/tracking/recommendations?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+        ] : [];
 
-    Promise.all([...publicCalls, ...privateCalls])
-        .then(([
-            friendsList, 
-            watchlistIds, 
-            diaryList, 
-            suggestionslist = [], 
-            activityList = [], 
-            likedIds = [], 
-            filmsCountVal = 0,
-            favIds = [],
-            pendingList = [], 
-            sentlist = [], 
-            recsList = []
-        ]) => {
+        Promise.all([...publicCalls, ...privateCalls])
+            .then(([
+                       userObj,
+                       friendsList,
+                       watchlistIds,
+                       diaryList,
+                       suggestionslist = [],
+                       activityList = [],
+                       likedIds = [],
+                       filmsCountVal = 0,
+                       favIds = [],
+                       pendingList = [],
+                       sentlist = [],
+                       recsList = []
+                   ]) => {
 
-            setFriends(friendsList || []);
-            setFriendsCount((friendsList || []).length);
-            setFilmsCount(Number(filmsCountVal) || 0);
-            setWatchlistShowIds(watchlistIds || []);
-            (watchlistIds || []).forEach(ensureWatchlistShowInfo);
+                // 🟢 პროფილის სურათის დამუშავება
+                if (userObj && userObj.profilePicture) {
+                    setProfilePicBase64(`data:image/jpeg;base64,${userObj.profilePicture}`);
+                } else {
+                    setProfilePicBase64(null);
+                }
 
-            setFavoriteShowIds(favIds || []);
-            (favIds || []).forEach(ensureWatchlistShowInfo);
+                setFriends(friendsList || []);
+                setFriendsCount((friendsList || []).length);
+                setFilmsCount(Number(filmsCountVal) || 0);
 
-            setLikedShows(likedIds || []);
-            (likedIds || []).forEach(it => ensureWatchlistShowInfo(it.showId));
+                setWatchlistShowIds(watchlistIds || []);
+                (watchlistIds || []).forEach(ensureWatchlistShowInfo);
 
-            setDiaryEntries(diaryList || []);
-            (diaryList || []).forEach(e => ensureWatchlistShowInfo(e.showId));
+                setFavoriteShowIds(favIds || []);
+                (favIds || []).forEach(ensureWatchlistShowInfo);
 
-            setSuggestions(suggestionslist || []);
-            setActivities((activityList || []).sort((a, b) => b.id - a.id));
+                setLikedShows(likedIds || []);
+                (likedIds || []).forEach(it => ensureWatchlistShowInfo(it.showId));
 
-            if (isOwnProfile) {
-                setPending(pendingList || []);
-                setSent(sentlist || []);
-                setRecommendations(recsList || []);
-            } else {
-                setPending([]);
-                setSent([]);
-                setRecommendations([]);
-            }
-        ])
-        .catch(err => console.error("Error loading profile data:", err))
-        .finally(() => setLoading(false));
-};
+                setDiaryEntries(diaryList || []);
+                (diaryList || []).forEach(e => ensureWatchlistShowInfo(e.showId));
 
-    const authHeaders = { Authorization: `Bearer ${token}` };
+                setSuggestions(suggestionslist || []);
+                setActivities((activityList || []).sort((a, b) => b.id - a.id));
 
-    // საჯარო მონაცემი (ნებისმიერი იუზერის): მეგობრები + watchlist + diary + profile + activity
-    // "People you may know" — ეს ყოველთვის შემხედველის (currentUsername) შემოთავაზებაა,
-    // ამიტომ ჩანს ნებისმიერი პროფილის Network ტაბზეც, არა მხოლოდ საკუთარზე.
-    const publicCalls = [
-        fetch(`https://localhost:8443/api/auth/user/${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : null)),
-        fetch(`${FRIENDS_BASE_URL}?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-        fetch(`https://localhost:8443/api/tracking/watchlist?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-        fetch(`https://localhost:8443/api/tracking/diary?username=${username}&viewer=${currentUsername || ''}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-        currentUsername
-            ? fetch(`${FRIENDS_BASE_URL}/suggestions?actingUsername=${currentUsername}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : []))
-            : Promise.resolve([]),
-        fetch(`https://localhost:8443/api/tracking/activity?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-        fetch(`https://localhost:8443/api/tracking/likes?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-        fetch(`https://localhost:8443/api/tracking/films-count?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : 0)),
-    ];
-
-    // Private data (own profile only) — მოთხოვნები/რეკომენდაციები მხოლოდ საკუთარია
-    const privateCalls = isOwnProfile ? [
-        fetch(`${FRIENDS_BASE_URL}/pending?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-        fetch(`${FRIENDS_BASE_URL}/sent?actingUsername=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
-        fetch(`https://localhost:8443/api/tracking/recommendations?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : []))
-    ] : [];
-
-    Promise.all([...publicCalls, ...privateCalls])
-        .then(([
-            userObj,
-            friendsList, 
-            watchlistIds, 
-            diaryList, 
-            suggestionslist = [], 
-            activityList = [], 
-            likedIds = [], 
-            filmsCountVal = 0,
-            pendingList = [], 
-            sentlist = [], 
-            recsList = []
-        ]) => {
-
-            // 🟢 Profile picture handling from feat/edit-profile
-            if (userObj && userObj.profilePicture) {
-                setProfilePicBase64(`data:image/jpeg;base64,${userObj.profilePicture}`);
-            } else {
-                setProfilePicBase64(null);
-            }
-
-            setFriends(friendsList || []);
-            setFriendsCount((friendsList || []).length);
-            setFilmsCount(Number(filmsCountVal) || 0);
-            setWatchlistShowIds(watchlistIds || []);
-            (watchlistIds || []).forEach(ensureWatchlistShowInfo);
-
-            setLikedShows(likedIds || []);
-            (likedIds || []).forEach(it => ensureWatchlistShowInfo(it.showId));
-
-            setDiaryEntries(diaryList || []);
-            (diaryList || []).forEach(e => ensureWatchlistShowInfo(e.showId));
-
-            setSuggestions(suggestionslist || []);
-            setActivities((activityList || []).sort((a, b) => b.id - a.id));
-
-            if (isOwnProfile) {
-                setPending(pendingList || []);
-                setSent(sentlist || []);
-                setRecommendations(recsList || []);
-            } else {
-                setPending([]);
-                setSent([]);
-                setRecommendations([]);
-            }
-        })
-        .catch(err => console.error("Error loading profile data:", err))
-        .finally(() => setLoading(false));
-};
-    // Mirrors ListDetailPage's per-show info fetch: the watchlist endpoint
+                if (isOwnProfile) {
+                    setPending(pendingList || []);
+                    setSent(sentlist || []);
+                    setRecommendations(recsList || []);
+                } else {
+                    setPending([]);
+                    setSent([]);
+                    setRecommendations([]);
+                }
+            }) // 🟢 აი აქ გასწორდა ფრჩხილი })-ზე
+            .catch(err => console.error("Error loading profile data:", err))
+            .finally(() => setLoading(false));
+    };
+// Mirrors ListDetailPage's per-show info fetch: the watchlist endpoint
     // only returns raw showIds, so poster/title come from a per-id lookup,
     // cached so repeat renders/tab switches don't refetch.
     const requestedWatchlistIds = useRef(new Set());
