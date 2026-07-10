@@ -113,12 +113,12 @@ public class TMDBServiceTest {
     @Test
     public void testGetTrendingShows_Success() {
         String mockResponse = "{\"results\":[{\"id\":777,\"name\":\"Trending Show\"}]}";
-        String expectedUrl = "https://api.themoviedb.org/3/trending/tv/week?api_key=a1de4b53c576eb9c6c54e242b324e8b1";
+        String expectedUrl = "https://api.themoviedb.org/3/trending/tv/week?api_key=a1de4b53c576eb9c6c54e242b324e8b1&language=en-US&page=2";
 
         mockServer.expect(requestTo(expectedUrl))
                 .andRespond(withSuccess(mockResponse, MediaType.APPLICATION_JSON));
 
-        String result = tmdbService.getTrendingShows();
+        String result = tmdbService.getTrendingShows(2);
         assertEquals(mockResponse, result);
         mockServer.verify();
     }
