@@ -1,3 +1,4 @@
 # IntelliJ IDEA build output (generated automatically when IntelliJ
 # compiles the project directly, separate from Maven's target/ dir)
 out/
+.idea/
