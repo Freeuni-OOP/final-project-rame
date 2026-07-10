@@ -195,6 +195,132 @@
     color: #dce6ef;
 }
 
+/* ---------- Favorite TV Shows section ---------- */
+.pp-fav-shows-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+}
+
+.pp-fav-show-item {
+    position: relative;
+    width: 92px;
+}
+
+.pp-fav-show-poster {
+    width: 92px;
+    height: 138px;
+    border-radius: 6px;
+    object-fit: cover;
+    cursor: pointer;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    display: block;
+    transition: transform 0.15s ease;
+}
+
+.pp-fav-show-poster:hover {
+    transform: translateY(-3px);
+}
+
+.pp-fav-show-placeholder {
+    background: linear-gradient(160deg, rgba(0, 180, 162, 0.3), rgba(91, 141, 239, 0.2));
+}
+
+.pp-fav-remove {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: none;
+    background: #e85d75;
+    color: #fff;
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.pp-fav-show-item:hover .pp-fav-remove {
+    opacity: 1;
+}
+
+.pp-fav-add {
+    position: relative;
+    max-width: 320px;
+}
+
+.pp-fav-search-input {
+    width: 100%;
+    background: #0f151c;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    color: #e6edf3;
+    padding: 9px 12px;
+    font-size: 0.88rem;
+    box-sizing: border-box;
+}
+
+.pp-fav-search-input::placeholder {
+    color: #5f758a;
+}
+
+.pp-fav-search-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 60;
+    margin-top: 6px;
+    background: #1b2530;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    padding: 4px;
+    max-height: 320px;
+    overflow-y: auto;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+}
+
+.pp-fav-search-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.pp-fav-search-item:hover {
+    background: rgba(0, 180, 162, 0.14);
+}
+
+.pp-fav-search-thumb {
+    width: 34px;
+    height: 51px;
+    border-radius: 4px;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.pp-fav-search-name {
+    color: #dce6ef;
+    font-size: 0.85rem;
+}
+
+.pp-fav-error {
+    color: #e85d75;
+    font-size: 0.82rem;
+    margin: 4px 0 0;
+}
+
 /* ---------- recent activity grid & cards ---------- */
 .pp-activity-grid {
     display: grid;
