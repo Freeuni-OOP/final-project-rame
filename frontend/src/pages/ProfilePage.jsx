@@ -17,7 +17,7 @@ const FRIENDS_BASE_URL = 'https://localhost:8443/api/friends';
 // genuinely empty (no fabricated rows) — just the filter chrome plus an
 // empty state, matching the real "no data yet" situation.
 const LIKES_FILTERS = ['Rating', 'Decade', 'Genre', 'Service', 'Sort by When Liked'];
-const LIKES_SUBTABS = ['TV Shows', 'Reviews', 'Lists'];
+const LIKES_SUBTABS = ['TV Shows', 'Lists'];
 
 // Watchlist is backed by the real "PLAN_TO_WATCH" show status (set from the
 // star icon on a show/details page). Backend already returns it newest-added
@@ -218,6 +218,7 @@ export default function ProfilePage() {
     const [favError, setFavError] = useState('');
 
     const [likedShows, setLikedShows] = useState([]); // Likes tab — [{showId, rating}], ბოლო-პირველი
+    const [likedLists, setLikedLists] = useState([]); // Likes → Lists ქვე-ტაბი — მოწონებული სიები
     const [likesSort, setLikesSort] = useState('liked-desc'); // liked-desc|liked-asc|rating-desc|rating-asc
     const [likesDecade, setLikesDecade] = useState('');
     const [likesGenre, setLikesGenre] = useState('');
@@ -342,6 +343,7 @@ export default function ProfilePage() {
             fetch(`https://localhost:8443/api/tracking/likes?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
             fetch(`https://localhost:8443/api/tracking/films-count?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : 0)),
             fetch(`https://localhost:8443/api/favorites?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
+            fetch(`https://localhost:8443/api/lists/liked?username=${username}`, { headers: authHeaders }).then(r => (r.ok ? r.json() : [])),
         ];
 
         // პირადი მონაცემები (მხოლოდ საკუთარი პროფილისთვის)
@@ -362,6 +364,7 @@ export default function ProfilePage() {
                        likedIds = [],
                        filmsCountVal = 0,
                        favIds = [],
+                       likedListsData = [],
                        pendingList = [],
                        sentlist = [],
                        recsList = []
@@ -386,6 +389,8 @@ export default function ProfilePage() {
 
                 setLikedShows(likedIds || []);
                 (likedIds || []).forEach(it => ensureWatchlistShowInfo(it.showId));
+
+                setLikedLists(likedListsData || []);
 
                 setDiaryEntries(diaryList || []);
                 (diaryList || []).forEach(e => ensureWatchlistShowInfo(e.showId));
@@ -1383,7 +1388,7 @@ export default function ProfilePage() {
                             ))}
                         </div>
 
-                        {likesSubTab === 'Films' && (
+                        {likesSubTab === 'TV Shows' && (
                             <div className="pp-likes-filters-row">
                                 <div className="pp-likes-filters">
                                     <span
@@ -1406,11 +1411,11 @@ export default function ProfilePage() {
                             </div>
                         )}
 
-                        {likesSubTab === 'Films' ? (
+                        {likesSubTab === 'TV Shows' ? (
                             visibleLikes.length === 0 ? (
                                 <div className="pp-likes-empty-box">
                                     <p className="pp-likes-empty-text">
-                                        {likedShows.length === 0 ? 'No liked films yet' : 'Nothing matches these filters'}
+                                        {likedShows.length === 0 ? 'No liked TV shows yet' : 'Nothing matches these filters'}
                                     </p>
                                 </div>
                             ) : (
@@ -1435,6 +1440,32 @@ export default function ProfilePage() {
                                             </div>
                                         );
                                     })}
+                                </div>
+                            )
+                        ) : likesSubTab === 'Lists' ? (
+                            likedLists.length === 0 ? (
+                                <div className="pp-likes-empty-box">
+                                    <p className="pp-likes-empty-text">No liked lists yet</p>
+                                </div>
+                            ) : (
+                                <div className="pp-liked-lists">
+                                    {likedLists.map((list) => (
+                                        <div
+                                            key={list.id}
+                                            className="pp-liked-list-card"
+                                            onClick={() => navigate(`/lists/${list.id}`)}
+                                        >
+                                            <div className="pp-liked-list-name">{list.name}</div>
+                                            <div className="pp-liked-list-meta">
+                                                <span className="pp-liked-list-pill">{list.isPublic ? 'Public' : 'Private'}</span>
+                                                {Array.isArray(list.items) && (
+                                                    <span>{list.items.length} {list.items.length === 1 ? 'show' : 'shows'}</span>
+                                                )}
+                                                <span className="pp-liked-list-hearts">♥ {list.likeCount || 0}</span>
+                                            </div>
+                                            <div className="pp-liked-list-owner">by {list.ownerUsername}</div>
+                                        </div>
+                                    ))}
                                 </div>
                             )
                         ) : (
