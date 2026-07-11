@@ -61,8 +61,8 @@ public class TMDBService {
         return restTemplate.getForObject(url, String.class);
     }
 
-    public String getTrendingShows() {
-        String url = baseUrl + "/trending/tv/week?api_key=" + apiKey;
+    public String getTrendingShows(int page) {
+        String url = baseUrl + "/trending/tv/week?api_key=" + apiKey + "&page=" + page;
         return restTemplate.getForObject(url, String.class);
     }
 

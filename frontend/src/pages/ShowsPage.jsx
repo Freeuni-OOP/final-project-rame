@@ -53,6 +53,7 @@ export default function ShowsPage() {
         const params = new URLSearchParams(location.search);
         const queryParam = params.get('query') || '';
         const genreParam = params.get('genre') || 'all';
+        const pageParam = parseInt(params.get('page') || '1', 10);
 
         setSelectedGenre(genreParam);
 
@@ -60,7 +61,7 @@ export default function ShowsPage() {
         if (queryParam.trim()) mode = 'text';
         else if (genreParam !== 'all') mode = 'genre';
 
-        fetchGridShows(1, mode, queryParam, genreParam);
+        fetchGridShows(pageParam, mode, queryParam, genreParam);
     }, [location.search]);
 
     // Track user statuses for all loaded shows
@@ -216,20 +217,16 @@ export default function ShowsPage() {
             params.set('genre', newGenre);
         }
         params.delete('query');
+        params.delete('page');
 
         navigate({ search: params.toString() });
     };
 
     const handlePageChange = (newPage) => {
         const params = new URLSearchParams(location.search);
-        const queryParam = params.get('query') || '';
-        const genreParam = params.get('genre') || 'all';
-
-        let mode = 'trending';
-        if (queryParam.trim()) mode = 'text';
-        else if (genreParam !== 'all') mode = 'genre';
-
-        fetchGridShows(newPage, mode, queryParam, genreParam);
+        params.set('page', String(newPage));
+        navigate({ search: params.toString() });
+        window.scrollTo(0, 0);
     };
 
     const renderShowCard = (show) => {
