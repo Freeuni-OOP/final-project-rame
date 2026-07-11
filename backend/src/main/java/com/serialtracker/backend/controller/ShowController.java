@@ -22,8 +22,9 @@ public class ShowController {
     }
 
     @GetMapping(value = "/trending", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<String> getTrending() {
-        return ResponseEntity.ok(tmdbService.getTrendingShows());
+    public ResponseEntity<String> getTrending(
+            @RequestParam(defaultValue = "1") int page) {
+        return ResponseEntity.ok(tmdbService.getTrendingShows(page));
     }
 
     @GetMapping(value = "/search", produces = MediaType.APPLICATION_JSON_VALUE)
